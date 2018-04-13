@@ -6,6 +6,7 @@
 
 require 'net/http'
 require 'cgi'
+require 'openssl'
 
 if ARGV.empty?
   puts "Usage: ruby drupalggedon2.rb <target> <command>"
