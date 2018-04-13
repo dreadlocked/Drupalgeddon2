@@ -1,4 +1,4 @@
-#### Drupalgeddon 2 CVE-2018-7200 exploit.
+#### Drupalgeddon 2 CVE-2018-7600 exploit.
 
 Ported from Vitalii Rudnykh original exploit to ruby.
 
