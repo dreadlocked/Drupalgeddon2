@@ -131,8 +131,8 @@ $http = Net::HTTP.new(uri.host, uri.port, proxy_addr, proxy_port)
 
 # Use SSL/TLS if needed
 if uri.scheme == "https"
-  http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  $http.use_ssl = true
+  $http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 end
 
 
