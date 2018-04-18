@@ -1,5 +1,11 @@
 #!/usr/bin/env ruby
 
+# -------------------------------------------------------------------------------------------------------------------------#
+#                                                                                                                          #
+#   This isn't the inteded script to use. Please, use drupalgeddon2.rb. This script was made just for testing purposes.    #
+#                                                                                                                          #
+#--------------------------------------------------------------------------------------------------------------------------#
+
 # This version works both Drupal 8.X and Drupal 7.X
 
 require 'base64'
