@@ -23,12 +23,13 @@ Authors:
 $ ruby drupalgeddon2.rb
 Usage: ruby drupalggedon2.rb <target>
        ruby drupalgeddon2.rb https://example.com
+$
 ```
 
 
 ### Drupal v8.x Example
 
-_Supported: v8.x < v8.3.9 / v8.4.x < v8.4.6 / v8.5.x < v8.5.1_
+_Drupal v8.x < v8.3.9 / v8.4.x < v8.4.6 / v8.5.x < v8.5.1_
 
 ```bash
 $ ./drupalgeddon2.rb http://localhost/drupal-8/
@@ -62,7 +63,7 @@ ubuntu140045x64-drupal>>
 
 ### Drupal v7.x Example
 
-_Supported: < v7.58_
+_Drupal < v7.58_
 
 ```
 $ ./drupalgeddon2.rb http://localhost/drupal-7/
