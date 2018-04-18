@@ -71,3 +71,7 @@ Vulnerable Versions:
 - Original Python PoC ~ https://github.com/a2u/CVE-2018-7600
 - cURL commands ~ https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708
 - CVE ~ https://nvd.nist.gov/vuln/detail/CVE-2018-7600
+
+#### Troubleshooting:
+- Sometimes, websites redirects to another path where Drupal exists, make sure you are introducing the correct Drupal path. (302 response)
+- If /user/password form is disabled, maybe you should find another form, but remember to change the exploit a bit, form_id parameter will change depending on the form used to exploit the vulnerability.
