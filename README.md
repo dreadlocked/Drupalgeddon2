@@ -14,6 +14,8 @@ Authors:
 - [g0tmi1k](https://blog.g0tmi1k.com/) _([@g0tmi1k](https://twitter.com/g0tmi1k))_
 
 
+Ey! Before opening an issue, please, read the throubleshooting section at the end of this readme. Thanks!
+
 - - -
 
 
@@ -121,6 +123,7 @@ proxy_port = 8080
 
 - Sometimes, websites may redirect to another path where Drupal exists (such as `30x` responses). Solution: Make sure you are using the correct Drupal path.
 - Drupal v7.x - If `/user/password` form is disabled, maybe you should find another form, but remember to change the exploit. Solution: `form_id` parameter will change depending on the form used to exploit the vulnerability.
+- If you cannot write a shell using drupalgeddon2.rb, use do-not-use.rb, this script doesn't write a shell to disk, and allows you to use whatever php method you want.
 
 
 - - -
