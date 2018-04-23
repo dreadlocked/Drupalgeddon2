@@ -44,6 +44,14 @@ def http_post(url, payload="")
   return $http.request(request)
 end
 
+def http_get(url, payload="")
+  uri = URI(url)
+  request = Net::HTTP::Get.new(uri.request_uri)
+  request.initialize_http_header({"User-Agent" => $useragent})
+  request.body = payload
+  return $http.request(request)
+end
+
 
 # Function gen_evil_url <cmd>
 def gen_evil_url(evil, feedback=true)
@@ -152,7 +160,7 @@ url = [
 # Check all
 url.each do|uri|
   # Check response
-  response = http_post(uri)
+  response = http_get(uri)
 
   if response.code == "200"
     puts "[+] Found  : #{uri} (#{response.code})"
