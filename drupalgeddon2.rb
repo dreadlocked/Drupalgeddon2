@@ -153,10 +153,16 @@ end
 $drupalverion = nil
 # Possible URLs
 url = [
+  # Drupal 6 / 7 / 8
   $target + "CHANGELOG.txt",
   $target + "core/CHANGELOG.txt",
+  # Drupal 6+7 / 8
   $target + "includes/bootstrap.inc",
   $target + "core/includes/bootstrap.inc",
+  # Drupal 6 / 7 / 8
+  $target + "includes/database.inc",
+  #$target + "includes/database/database.inc",
+  #$target + "core/includes/database.inc",
 ]
 # Check all
 url.each do|uri|
@@ -172,7 +178,8 @@ url.each do|uri|
     # Try and get version from the file contents
     $drupalverion = response.body.match(/Drupal (.*),/).to_s.slice(/Drupal (.*),/, 1).to_s.strip
 
-    # If not, try and get it from the URL
+    # If not, try and get it from the URL (In theory, these will never trigger/work as they will be HTTP 403)
+    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil if $drupalverion.empty?
     $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
 
     # Done!
@@ -181,7 +188,8 @@ url.each do|uri|
     puts "[+] Found  : #{uri} (#{response.code})"
 
     # Get version from URL
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x"
+    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil
+    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
   else
     puts "[!] MISSING: #{uri} (#{response.code})"
   end
@@ -196,6 +204,10 @@ else
   puts "[!] Didn't detect Drupal version"
   puts "[!] Forcing Drupal v8.x attack"
   $drupalverion = "8.x"
+end
+if not $drupalverion.start_with?("7") and not $drupalverion.start_with?("8")
+  puts "[!] Unsupported Drupal version"
+  exit
 end
 puts "-"*80
 
