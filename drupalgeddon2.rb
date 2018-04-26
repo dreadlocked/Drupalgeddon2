@@ -180,7 +180,7 @@ url.each do|uri|
 
     # If not, try and get it from the URL (In theory, these will never trigger/work as they will be HTTP 403)
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil if $drupalverion.empty?
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
+    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.nil?
 
     # Done!
     break
@@ -189,7 +189,7 @@ url.each do|uri|
 
     # Get version from URL
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
+    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.nil?
   else
     puts "[!] MISSING: #{uri} (#{response.code})"
   end
