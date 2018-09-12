@@ -225,16 +225,29 @@ $drupalverion = ""
 
 # Possible URLs
 url = [
-  # Drupal 6 / 7 / 8
+  # --- Changelog ---
+  # Drupal v6.x / v7.x [200]
   $target + "CHANGELOG.txt",
+  # Drupal v8.x [200]
   $target + "core/CHANGELOG.txt",
-  # Drupal 6+7 / 8
+
+  # --- bootstrap ---
+  # Drupal v7.x / v6.x [403]
   $target + "includes/bootstrap.inc",
+  # Drupal v8.x [403]
   $target + "core/includes/bootstrap.inc",
-  # Drupal 6 / 7 / 8
+
+  # --- database ---
+  # Drupal v7.x / v6.x  [403]
   $target + "includes/database.inc",
+  # Drupal v7.x [403]
   #$target + "includes/database/database.inc",
+  # Drupal v8.x [403]
   #$target + "core/includes/database.inc",
+
+  # --- landing page ---
+  # Drupal v8.x / v7.x [200]
+  $target,
 ]
 
 # Check all
@@ -253,7 +266,7 @@ url.each do|uri|
     end
   end
 
-  # Check URL path
+  # Check request response, valid
   if response.code == "200"
     puts success("Found  : #{uri}    (HTTP Response: #{response.code})")
 
@@ -263,27 +276,47 @@ url.each do|uri|
     # Check to see if it says: <h1 class="js-quickedit-page-title title page-title">Page not found</h1> <div class="content">The requested page could not be found.</div>
     puts warning("WARNING: Could be a false-positive [1-2], as the file could be reported to be missing") if response.body.downcase.include? "the requested page could not be found"
 
-    # Check if valid. Source ~ https://api.drupal.org/api/drupal/core%21CHANGELOG.txt/8.5.x // https://api.drupal.org/api/drupal/CHANGELOG.txt/7.x
-    puts warning("WARNING: Unable to detect keyword 'drupal.org'") if not response.body.downcase.include? "drupal.org"
+    # Only works for CHANGELOG.txt
+    if uri.match(/CHANGELOG.txt/)
+      # Check if valid. Source ~ https://api.drupal.org/api/drupal/core%21CHANGELOG.txt/8.5.x // https://api.drupal.org/api/drupal/CHANGELOG.txt/7.x
+      puts warning("WARNING: Unable to detect keyword 'drupal.org'") if not response.body.downcase.include? "drupal.org"
 
-    # Patched already? (For Drupal v8.4.x/v7.x)
-    puts warning("WARNING: Might be patched! Found SA-CORE-2018-002: #{url}") if response.body.include? "SA-CORE-2018-002"
+      # Patched already? (For Drupal v8.4.x / v7.x)
+      puts warning("WARNING: Might be patched! Found SA-CORE-2018-002: #{url}") if response.body.include? "SA-CORE-2018-002"
 
-    # Try and get version from the file contents (For Drupal v8.4.x/v7.x)
-    $drupalverion = response.body.match(/Drupal (.*),/).to_s.slice(/Drupal (.*),/, 1).to_s.strip
-    # Blank if not vaid
-    $drupalverion = "" if not $drupalverion[-1] =~ /\d/
+      # Try and get version from the file contents (For Drupal v8.4.x / v7.x)
+      $drupalverion = response.body.match(/Drupal (.*),/).to_s.slice(/Drupal (.*),/, 1).to_s.strip
 
+      # Blank if not valid
+      $drupalverion = "" if not $drupalverion[-1] =~ /\d/
+    end
+
+    # Check meta tag
+    #if $drupalverion.empty?
+    if uri.match(/^#{$target}$/)
+      metatag = response.body.match(/meta name="Generator" content="Drupal (.*) \(http/).to_s.slice(/meta name="Generator" content="Drupal (.*) \(http/, 1).to_s.strip
+
+      #if $drupalverion.empty? and not metatag.empty?
+      if not metatag.empty?
+        $drupalverion = "#{metatag}.x"
+        puts success("Metatag: Generator    (v#{$drupalverion})")
+      end
+    end
+
+    # --- Disabling as this comes in HTTP 403 ---
     # If not, try and get it from the URL (For Drupal v6.x)
-    $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
+    #$drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
     # If not, try and get it from the URL (For Drupal v8.5.x)
-    $drupalverion = uri.match(/core/)? "8.x" : "" if $drupalverion.empty?
+    #$drupalverion = uri.match(/core/)? "8.x" : "" if $drupalverion.empty?
+
     # Fall back
+    puts warning("WARNING: Falling back to v7.x") if $drupalverion.empty?
     $drupalverion = "7.x" if $drupalverion.empty?
 
     # Done! ...if a full known version, else keep going... may get lucky later!
     break if not $drupalverion.end_with?("x")
 
+  # Check request response, not allowed
   elsif response.code == "403"
     puts success("Found  : #{uri}    (HTTP Response: #{response.code})")
 
@@ -291,6 +324,7 @@ url.each do|uri|
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
     # If not, try and get it from the URL (For Drupal v8.5.x)
     $drupalverion = uri.match(/core/)? "8.x" : "" if $drupalverion.empty?
+
     # Fall back
     $drupalverion = "7.x" if $drupalverion.empty?
 
