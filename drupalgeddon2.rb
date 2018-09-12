@@ -235,6 +235,7 @@ url = [
   $target + "includes/database.inc",
   #$target + "includes/database/database.inc",
   #$target + "core/includes/database.inc",
+  $target,
 ]
 
 # Check all
@@ -273,6 +274,18 @@ url.each do|uri|
     $drupalverion = response.body.match(/Drupal (.*),/).to_s.slice(/Drupal (.*),/, 1).to_s.strip
     # Blank if not vaid
     $drupalverion = "" if not $drupalverion[-1] =~ /\d/
+
+    # Check meta tag
+    #if $drupalverion.empty?
+    if uri.match(/^#{$target}$/)
+      metatag = response.body.match(/meta name="Generator" content="Drupal (.*) \(http/).to_s.slice(/meta name="Generator" content="Drupal (.*) \(http/, 1).to_s.strip
+
+      #if $drupalverion.empty? and not metatag.empty?
+      if not metatag.empty?
+        $drupalverion = "#{metatag}.x"
+        puts success("Metatag: Generator    (v#{$drupalverion})")
+      end
+    end
 
     # If not, try and get it from the URL (For Drupal v6.x)
     $drupalverion = uri.match(/includes\/database.inc/)? "6.x" : "" if $drupalverion.empty?
