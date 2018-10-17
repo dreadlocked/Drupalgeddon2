@@ -177,10 +177,19 @@ end
 
 # Quick how to use
 if ARGV.empty?
-  puts "Usage: ruby drupalggedon2.rb <target>"
+  puts "Usage: ruby drupalggedon2.rb <target> [--verbose]"
   puts "       ruby drupalgeddon2.rb https://example.com"
   exit
 end
+
+require 'highline/import'
+
+$verbose = false
+if ARGV.length == 2 and ARGV[1] == '--verbose'
+  # Settings - Output
+  $verbose = true
+end
+
 # Read in values
 $target = ARGV[0]
 
