@@ -307,10 +307,11 @@ url.each do|uri|
     end
 
     # Done! ...if a full known version, else keep going... may get lucky later!
-    break if not $drupalverion.end_with?("x")
+    break if not $drupalverion.end_with?("x") and not $drupalverion.empty?
+  end
 
   # Check request response, not allowed
-  elsif response.code == "403"
+  if response.code == "403" and $drupalverion.empty?
     tmp = $verbose ?  "    [HTTP Size: #{response.size}]"  : ""
     puts success("Found  : #{uri}    (HTTP Response: #{response.code})#{tmp}")
 
