@@ -27,10 +27,22 @@ Notes:
 
 ```bash
 $ ruby drupalgeddon2.rb
-Usage: ruby drupalggedon2.rb <target>
+Usage: ruby drupalggedon2.rb <target> [--verbose] [--authentication]
        ruby drupalgeddon2.rb https://example.com
 $
 ```
+The `--verbose` and `--authentication` parameter can be added in any order after <target> 
+and they are both optional.
+If `--authentication` is specified then you will be prompted with a request to submit
+* username, 
+* password, 
+* form field name for username, 
+* form field name for password,
+* URL path to the web login page, e.g., `user/login`
+* eventual suffix to append after the credentials in the form submission, e.g., form_id, etc.
+
+This is to support exploiting websites that first require POST-based web login and who 
+respond with a session cookie, upon successful authentication.
 
 
 ### Drupal v8.x Example
