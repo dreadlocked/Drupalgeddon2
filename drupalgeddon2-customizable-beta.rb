@@ -67,7 +67,7 @@ rescue Exception => e
     puts success('Done')
   else
     puts info('As you like. Good Bye!')
-    puts e, e.message
+    puts e
     exit!
   end
 end
