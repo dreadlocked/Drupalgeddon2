@@ -9,29 +9,6 @@ require 'openssl'
 require 'base64'
 require 'json'
 
-# Check external gems and install it automatecally
-begin
-  require 'nokogiri'
-rescue Exception => e
-  include Utils
-  puts error('Missing gems.')
-  yes = ask('Do you want me to install it for you?[y/n] ')
-  if yes[0] == /y/i
-    puts action('Installing missing gems...')
-    gemfile do
-      source 'https://rubygems.org'
-      gem 'nokogiri', require: true
-    end
-    puts success('Done')
-  else
-    puts ask('As you like.')
-    puts e, e.message
-    exit!
-  end
-
-end
-
-
 #
 # Utils module for general and unrelated operations
 #
@@ -56,10 +33,10 @@ module Utils
   #   The question you want to print to the user
   # @param [String] answer
   #   The user's answer
-  # @return
-  #   [String]
+  # @return  [String]
+  # 
   def ask(question, answer = nil)
-    answer = Readline.readline(">> #{question}", true) while answer.nil? || answer.squeeze.strip.empty?
+    answer = Readline.readline("#{question}", true) while answer.nil? || answer.squeeze.strip.empty?
     answer
   end
 
@@ -71,6 +48,31 @@ module Utils
   end
 
 end
+
+# 
+# Check external gems and install it automatecally
+# 
+begin
+  require 'nokogiri'
+rescue Exception => e
+  include Utils
+  puts error('Missing gems.')
+  yes = ask(action('Do you want me to install it for you?[y/n] '))
+  if yes[0] == /y/i
+    puts action('Installing missing gems...')
+    gemfile do
+      source 'https://rubygems.org'
+      gem 'nokogiri', require: true
+    end
+    puts success('Done')
+  else
+    puts info('As you like. Good Bye!')
+    puts e, e.message
+    exit!
+  end
+end
+
+
 
 #
 # All target related operations
