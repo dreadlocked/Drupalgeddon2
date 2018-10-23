@@ -194,6 +194,9 @@ $ ruby drupalgeddon2-customizable-beta.rb https://example.com 7 id passthru 0
 
 ## Troubleshooting:
 
+- Whenever getting a _cannot load such file_ "LoadError" type of error, do run `sudo gem install <missing dependency>`.
+In particular, you may need to install the _highline_ dependency with `sudo gem install highline`
+
 - The target may redirect to another path, where Drupal exists (such as `HTTP 30x` responses)
     - Solution: Make sure you are using the correct Drupal path
 
