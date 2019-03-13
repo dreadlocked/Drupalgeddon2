@@ -1,0 +1,122 @@
+
+44,725 repository results
+drupal/drupal Mirror
+Verbatim mirror of the git.drupal.org repository for Drupal core. Changes will not be pulled, and merge requests will…
+Updated on Feb 1
+
+ PHP
+ 3.2k
+drupal-composer/drupal-project
+rocket Composer template for Drupal projects. Quick installation via "composer create-project drupal-composer/drupal-project"
+composer
+drupal
+GPL-2.0 license
+
+Updated 9 hours ago
+
+1 issue needs help
+ PHP
+ 1.2k
+geerlingguy/drupal-vm
+A VM for Drupal development
+vagrant
+drupal
+ansible
+docker
+virtualbox
+cms
+development
+vm
+environment
+local
+MIT license
+
+Updated 5 days ago
+
+ Shell
+ 1.2k
+wodby/docker4drupal
+Docker-based Drupal stack
+drupal
+docker
+docker-compose
+alpine
+MIT license
+
+Updated 11 hours ago
+
+ Shell
+ 798
+hechoendrupal/drupal-console
+The Drupal CLI. A tool to generate boilerplate code, interact with and debug Drupal.
+php
+cli
+console
+symfony
+drupal
+scaffold
+code-generation
+drupal8
+GPL-2.0 license
+
+Updated 21 days ago
+
+ PHP
+ 841
+docker-library/drupal
+Docker Official Image packaging for Drupal
+Updated 20 days ago
+
+ Dockerfile
+ 176
+RESTful-Drupal/restful
+RESTful best practices for Drupal
+Updated 22 days ago
+
+ PHP
+ 400
+signalpoint/DrupalGap
+An application development kit for Drupal websites.
+javascript
+drupal
+web-app
+mobile-app
+GPL-2.0 license
+
+Updated on Jul 17, 2018
+
+ JavaScript
+ 222
+hechoendrupal/drupal8-links
+Drupal 8 links & resources
+Updated on Apr 18, 2017
+
+ 286
+dreadlocked/Drupalgeddon2
+Exploit for Drupal v7.x + v8.x (Drupalgeddon 2 / CVE-2018-7600 / SA-CORE-2018-002)
+drupalgeddon2
+drupal
+exploit
+drupal7
+poc
+drupal8
+cve-2018-7600
+sa-core-2018-002
+drupalgeddon
+Updated 23 days ago
+
+3 issues need help
+ Ruby
+ 360
+© 2019 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Help
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
