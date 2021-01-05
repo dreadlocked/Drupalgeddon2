@@ -295,7 +295,7 @@ url.each do|uri|
 
   # Check header
   if response['X-Generator'] and $drupalverion.empty?
-    header = response['X-Generator'].slice(/Drupal (.*) \(https:\/\/www.drupal.org\)/, 1).to_s.strip
+    header = response['X-Generator'].slice(/Drupal (.*) \(https?:\/\/(www.)?drupal.org\)/, 1).to_s.strip
 
     if not header.empty?
       $drupalverion = "#{header}.x" if $drupalverion.empty?
